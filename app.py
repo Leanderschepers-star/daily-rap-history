@@ -4,6 +4,35 @@ import requests
 import base64
 import pytz
 
+# --- 1. ACCESS THE TOKEN ---
+# This pulls the token from your Streamlit Secrets
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+
+# --- 2. SYNC WITH APP 1 ---
+APP_1_REPO = "Leanderschepers-star/daily-rap-app" 
+APP_1_FILE = "streamlit_app.py" 
+
+def get_synced_words():
+    url = f"https://api.github.com/repos/{APP_1_REPO}/contents/{APP_1_FILE}"
+    # Use the token we just defined above
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()['content']).decode('utf-8')
+        local_vars = {}
+        try:
+            # Finding the lists in your 1st app
+            exec(content[content.find("words ="):content.find("]", content.find("words ="))+1], {}, local_vars)
+            exec(content[content.find("sentences ="):content.find("]", content.find("sentences ="))+1], namespace if 'namespace' in locals() else {}, local_vars)
+            return local_vars.get('words'), local_vars.get('sentences')
+        except:
+            return None, None
+    return None, None
+
+# Try to get synced words
+synced_words, synced_sentences = get_synced_words()
+
 # --- 1. CONFIG ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"] 
 REPO_NAME = "Leanderschepers-star/daily-rap-history"
@@ -31,7 +60,8 @@ def update_github_file(path, content, msg="Update"):
     return requests.put(url, json=data, headers=headers)
 
 # --- 4. DATA BANK (ADD YOUR FULL LISTS HERE) ---
-words = [
+if not synced_words:
+    words = [
     {"word": "Obsession", "rhymes": "Possession, Progression, Lesson"}, {"word": "Titanium", "rhymes": "Cranium, Uranium, Stadium"},
     {"word": "Mirage", "rhymes": "Garage, Collage, Sabotage"}, {"word": "Renaissance", "rhymes": "Response, Sconce, Nonce"},
     {"word": "Velocity", "rhymes": "Ferocity, Atrocity, Reciprocity"}, {"word": "Atmosphere", "rhymes": "Last year, Frontier, Revere"},
@@ -592,7 +622,10 @@ motivation = [
     "Your potential is waiting for you to unleash it.", "Keep working hard and stay true to your vision.",
     "Success is the final destination on your journey of excellence."
 ]
-
+else:
+    # If the sync DID work, we use those instead!
+    words = synced_words
+    sentences = synced_sentences
 # --- 5. DATA EXECUTION ---
 daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
@@ -619,6 +652,10 @@ st.write(f"### Entry for: {formatted_date}")
 st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}")
 
 st.divider()
+with st.sidebar:
+    st.title("🔗 Connections")
+    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app.streamlit.app/)")
+    st.info("Both apps are now synced! They use the same word list from App 1.")
 
 # --- 7. LOAD & CAPITALIZE LOGIC ---
 hist_file = get_github_file(HISTORY_PATH)

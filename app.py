@@ -655,7 +655,7 @@ st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}"
 st.divider()
 with st.sidebar:
     st.title("🔗 Connections")
-    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app")
+    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
     st.info("Both apps are now synced! They use the same word list from App 1.")
 
 # --- 7. LOAD & CAPITALIZE LOGIC ---

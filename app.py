@@ -43,12 +43,14 @@ def calculate_points(content):
     if not content:
         return 0
     
+    import re  # <--- ADD THIS LINE HERE
+    
     # 1. Points for total entries
     entry_count = content.count("DATE:")
     total_points = entry_count * 10
     
     # 2. Points for total words (effort)
-    # Remove metadata to only count lyrics
+    # This removes the metadata so we only count your actual bars
     just_lyrics = re.sub(r'(DATE|WORD|LYRICS):.*', '', content)
     words = len(just_lyrics.split())
     total_points += (words // 10) 
@@ -59,6 +61,7 @@ def calculate_points(content):
     elif current_streak >= 3: total_points += 50
     
     return total_points
+
 # --- 1. ACCESS THE TOKEN ---
 # This pulls the token from your Streamlit Secrets
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]

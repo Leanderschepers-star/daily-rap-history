@@ -1,89 +1,35 @@
 import streamlit as st
-import random
 import datetime
 import requests
 import base64
-import pytz  # Handles global timezones
+import pytz
 
 # --- 1. CONFIG ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"] 
-REPO_NAME = "Leanderschepers-star/daily-rap-app"
-FILE_PATH = "daily_bars.txt"
+REPO_NAME = "Leanderschepers-star/daily-rap-history"
+HISTORY_PATH = "history.txt"
 
-# --- 2. TIME (WORLD-READY WITH PYTZ) ---
+# --- 2. TIME & DATE ---
 belgium_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.datetime.now(belgium_tz)
-current_hour = be_now.hour
+today_str = be_now.strftime('%d/%m/%Y')
 day_of_year = be_now.timetuple().tm_yday
 
-# --- 3. THE AUTOMATION FUNCTION ---
-def run_daily_automation(word, sentence, quote):
-    st.sidebar.header("⏱️ Status")
-    st.sidebar.write(f"Local Time (Brussels): {be_now.strftime('%H:%M')}")
-    
-    # Memory stamp to prevent double-sending within the same hour
-    today_stamp = f"{be_now.date()}-{current_hour}"
-    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{FILE_PATH}"
+# --- 3. GITHUB HELPERS ---
+def get_github_file(path):
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    
-    should_send = False
-    sha = None
-    existing_text = ""
-    
-    # 1. Check if we already updated this hour
-    try:
-        r = requests.get(url, headers=headers)
-        if r.status_code == 200:
-            data = r.json()
-            sha = data['sha']
-            existing_text = base64.b64decode(data['content']).decode('utf-8')
-            if today_stamp not in existing_text:
-                should_send = True
-        else:
-            should_send = True 
-    except:
-        should_send = True
+    r = requests.get(url, headers=headers)
+    return r.json() if r.status_code == 200 else None
 
-    # 2. TRIGGER LOGIC: Checks if it's one of your drop hours
-    if current_hour in [0, 10, 11, 20, 21, 22] and should_send:
-        topic = "leanders_daily_bars"
-        
-        # Determine Title
-        if current_hour == 0: title = "Midnight Bars"
-        elif current_hour == 10: title = "Morning Grind"
-        elif current_hour == 11: title = "You Got This"
-        elif current_hour == 20: title = "Evening Session"
-        elif current_hour == 21: title = "Last Chance"
-        elif current_hour == 23: title = "Last Chance"
-        else: title = "Daily Update"
-
-        full_msg = f"WORD: {word.upper()}\n\n{sentence}\n\nMotivation: {quote}"
-
-        try:
-            # Send the push notification
-            requests.post(f"https://ntfy.sh/{topic}", 
-                          data=full_msg.encode('utf-8'), 
-                          headers={"Title": title, "Priority": "high"})
-            
-# This version uses \n to create new lines directly in the text file
-            new_content = f"WORD: {word.upper()}\nSentence: {sentence}\nMotivation: {quote}\n{today_stamp}"
-            
-            encoded = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
-            update_data = {"message": f"Layout Update {title}", "content": encoded}
-            if sha: update_data["sha"] = sha
-            
-            requests.put(url, json=update_data, headers=headers)
-            
-            encoded = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
-            update_data = {"message": f"Clean Update {title}", "content": encoded}
-            if sha: update_data["sha"] = sha
-            
-            requests.put(url, json=update_data, headers=headers)
-            st.sidebar.success(f"Sent & Cleaned: {title}")
-        except:
-            st.sidebar.error("Notification sent, but GitHub update failed.")
-    else:
-        st.sidebar.info("Standing by for next drop...")
+def update_github_file(path, content, msg="Update"):
+    file_data = get_github_file(path)
+    sha = file_data['sha'] if file_data else None
+    url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+    data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
+    return requests.put(url, json=data, headers=headers)
 
 # --- 4. DATA BANK (ADD YOUR FULL LISTS HERE) ---
 words = [
@@ -648,65 +594,46 @@ motivation = [
     "Success is the final destination on your journey of excellence."
 ]
 
-# --- 5. EXECUTION ---
-# Pick today's data using the current Day of the Year
+# --- 5. DATA EXECUTION ---
 daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
-daily_quote = motivation[day_of_year % len(motivation)]
 
-# Trigger the automation check
-run_daily_automation(daily_word['word'], daily_sentence, daily_quote)
+# --- 6. THE WEBSITE UI ---
+st.set_page_config(page_title="Rap Journal", page_icon="📝")
 
-# --- 6. THE UI (FRONT END) ---
-st.title("🎤 LEANDER'S DAILY BARS")
+st.title("🎤 Daily Rap Journal")
+st.write(f"### Today is {today_str}")
 
-# 1. SIMPLE & SAFE CLEANING FUNCTION
-def clean_text_safe(text):
-    if not text:
-        return ""
-    # Just cut off anything after the log divider
-    text = text.split("---")[0]
-    text = text.split("LOG:")[0]
-    # Remove the "WORD:" or "Motivation:" labels if they exist in the string
-    text = text.replace("WORD:", "").replace("Motivation:", "")
-    return text.strip()
-
-# 2. APPLY CLEANING
-try:
-    display_sentence = clean_text_safe(daily_sentence)
-    display_quote = clean_text_safe(daily_quote)
-    display_word = daily_word['word'] if isinstance(daily_word, dict) else daily_word
-except Exception:
-    # If anything goes wrong, just show the raw text so the screen isn't black
-    display_sentence = daily_sentence
-    display_quote = daily_quote
-    display_word = "Check Data"
-
-# 3. DISPLAY THE WIDGETS
-# These lines create the white/colored boxes
-st.header(str(display_word).upper())
-
-# Only show rhymes if they exist
-if isinstance(daily_word, dict) and 'rhymes' in daily_word:
-    st.markdown(f"**Rhymes:** {daily_word['rhymes']}")
+# Display the word and prompt in a nice box
+st.info(f"**WORD:** {daily_word['word'].upper()}  \n**RHYMES:** {daily_word.get('rhymes', '')}  \n**PROMPT:** {daily_sentence}")
 
 st.divider()
 
-# The Info and Warning boxes (The "Widgets")
-st.info(f"📝 {display_sentence}")
-st.warning(f"🔥 {display_quote}")
+# --- 7. WRITING & SAVING ---
+user_lyrics = st.text_area("Write your lyrics below:", height=250, placeholder="Type your bars here...")
 
-st.sidebar.divider()
-st.sidebar.caption("v1.4 | Global Timezone Logic (pytz)")
+if st.button("🚀 Save Entry"):
+    hist_file = get_github_file(HISTORY_PATH)
+    old_hist = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+    
+    # Check if a log for today already exists
+    status = user_lyrics if user_lyrics.strip() else "(No lyrics recorded for today)"
+    
+    # Create the text entry
+    new_entry = f"DATE: {today_str}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n{'-'*30}\n\n"
+    
+    # Save to GitHub (Newest on top)
+    update_github_file(HISTORY_PATH, new_entry + old_hist, f"Journal Entry: {today_str}")
+    st.success("Your progress has been saved!")
+    st.balloons()
 
-# --- 7. ONE-LINE OUTPUT FOR KWGT ---
-# This puts everything in one clean line separated by |
+# --- 8. HISTORY LOG ---
 st.divider()
-st.write("KWGT_DATA_START")
-st.code(f"{display_word} | {display_sentence} | {display_quote}")
-st.write("KWGT_DATA_END")
-
-
-
-
-
+st.subheader("📜 Your Writing History")
+hist_file = get_github_file(HISTORY_PATH)
+if hist_file:
+    full_history = base64.b64decode(hist_file['content']).decode('utf-8')
+    # Display the history in a clean text block
+    st.text_area("Archive:", full_history, height=400, disabled=True)
+else:
+    st.write("No history found. Start writing today!")

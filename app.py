@@ -655,47 +655,53 @@ if st.button("🚀 Save Entry"):
     st.success(f"Journal updated for {formatted_date}!")
     st.balloons()
 
-# --- 8. HISTORY VIEW (THE SMART TIMELINE) ---
+# --- 8. HISTORY VIEW (TIMELINE STARTING DEC 19) ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-hist_file = get_github_file(HISTORY_PATH)
-if hist_file:
-    full_text = base64.b64decode(hist_file['content']).decode('utf-8')
-    # Split by our divider
-    entries = full_text.split("------------------------------")
-    
-    for entry in entries:
-        if "DATE:" in entry:
-            # Extract info for the labels
-            try:
-                # Splitting the text to find specific lines
-                lines = entry.strip().split("\n")
-                date_val = lines[0].replace("DATE: ", "")
-                word_val = lines[1].replace("WORD: ", "")
-                
-                # Finding where lyrics start
-                lyric_start_index = entry.find("LYRICS:") + 7
-                lyric_content = entry[lyric_start_index:].strip()
+# 1. Define the Start Date
+start_date = datetime.date(2025, 12, 19)
+end_date = be_now.date()
 
-                # Create an expandable box for each day
-                with st.expander(f"📅 {date_val} — Word: {word_val}"):
-                    # Look up the sentence for this date to display it
-                    try:
-                        temp_date = datetime.datetime.strptime(date_val, '%d/%m/%Y')
-                        temp_day_of_year = temp_date.timetuple().tm_yday
-                        hist_sentence = sentences[temp_day_of_year % len(sentences)]
-                        st.caption(f"Prompt: {hist_sentence}")
-                    except:
-                        pass
-                    
-                    st.divider()
-                    
-                    if "(No lyrics recorded)" in lyric_content or not lyric_content:
-                        st.error("🚫 You didn't write any lyrics this day.")
-                    else:
-                        st.markdown(f"**Your Bars:**\n\n{lyric_content}")
-            except:
-                continue
-else:
-    st.info("Your journal is empty. Save your first entry to see it here!")
+# 2. Get current history from GitHub
+hist_file = get_github_file(HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+
+# 3. Generate the timeline range
+delta = end_date - start_date
+for i in range(delta.days + 1):
+    # Go backwards from today to the start date
+    current_day = end_date - datetime.timedelta(days=i)
+    day_str = current_day.strftime('%d/%m/%Y')
+    
+    # Calculate word/sentence for this specific historical day
+    temp_day_of_year = current_day.timetuple().tm_yday
+    hist_word = words[temp_day_of_year % len(words)]
+    hist_sentence = sentences[temp_day_of_year % len(sentences)]
+    
+    # Check if we have an entry in the text file for this date
+    entry_found = False
+    lyric_content = ""
+    
+    if f"DATE: {day_str}" in full_text:
+        entry_found = True
+        # Extract the lyrics for this specific date from the file
+        try:
+            parts = full_text.split(f"DATE: {day_str}")
+            relevant_part = parts[1].split("------------------------------")[0]
+            lyric_start = relevant_part.find("LYRICS:") + 7
+            lyric_content = relevant_part[lyric_start:].strip()
+        except:
+            lyric_content = "(Error reading lyrics)"
+
+    # 4. Display the Day in the UI
+    with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
+        st.caption(f"Prompt: {hist_sentence}")
+        st.divider()
+        
+        if entry_found and lyric_content and "(No lyrics recorded)" not in lyric_content:
+            st.markdown(f"**Your Bars:**\n\n{lyric_content}")
+        else:
+            st.error("🚫 No lyrics recorded for this day.")
+            if st.button(f"Write for {day_str}", key=f"btn_{day_str}"):
+                st.info("Scroll up to the 'Select Date' calendar and pick this date to fill it in!")

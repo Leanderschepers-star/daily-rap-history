@@ -716,10 +716,31 @@ st.divider()
 # >>> END OF STREAK SECTION <<<
 
 existing_lyrics = ""
-if f"DATE: {formatted_date}" in full_text:
-    # ... rest of your code ...
-# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
+# --- 7. LOAD & CAPITALIZE LOGIC ---
+hist_file = get_github_file(HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
+# ... Streak code should be here ...
+
+existing_lyrics = ""
+if f"DATE: {formatted_date}" in full_text:
+    try:
+        parts = full_text.split(f"DATE: {formatted_date}")
+        relevant_part = parts[1].split("------------------------------")[0]
+        # FIX: Ensure all these lines are indented!
+        lyric_start = relevant_part.find("LYRICS:") + 7
+        existing_lyrics = relevant_part[lyric_start:].strip()
+        if existing_lyrics == "(No lyrics recorded)": 
+            existing_lyrics = ""
+    except:
+        existing_lyrics = ""
+
+# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
+# This line (line 725) should be back at the far left margin
+if "reset_count" not in st.session_state:
+    st.session_state.reset_count = 0
+    
+# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
 # We create a unique ID for the text box. 
 # If the date changes, the ID changes, and the box MUST clear.
 if "reset_count" not in st.session_state:

@@ -792,7 +792,7 @@ if st.button("🚀 Save Entry & Next Day"):
     # 1. Increment reset count to force a new text area ID
     st.session_state.reset_count += 1
     # 2. Advance the date
-    st.session_state.current_date = selected_date + datetime.timedelta(days=1)
+    st.session_state.current_date = selected_date + timedelta(days=1)
     
     st.success("Saved! Moving to the next day...")
     st.rerun()

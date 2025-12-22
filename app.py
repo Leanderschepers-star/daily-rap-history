@@ -11,37 +11,32 @@ def calculate_streak(content):
         return 0
     
     import re
-    # Look for DD/MM/YYYY specifically after the word "DATE: "
+    # 1. Extract all unique dates from the file
     found_dates = set(re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', content))
-    
     if not found_dates:
         return 0
     
-    # Convert to date objects and sort newest to oldest
-    date_objs = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates], reverse=True)
+    # 2. Convert string dates to actual Python date objects
+    date_objs = {datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates}
     
-    # Get the current date in Belgium
+    # 3. Start from Today (Belgium Time)
     today = datetime.now(pytz.timezone('Europe/Brussels')).date()
     yesterday = today - timedelta(days=1)
     
-    # If the newest date in history isn't today or yesterday, streak is 0
-    if date_objs[0] < yesterday:
+    # --- THE STRICT CHECK ---
+    # If you haven't written today AND you didn't write yesterday, streak is dead.
+    if today not in date_objs and yesterday not in date_objs:
         return 0
     
+    # Start counting from the most recent entry (either today or yesterday)
+    current_check = today if today in date_objs else yesterday
     streak = 0
-    # If we wrote today, start counting from today. 
-    # Otherwise, start counting from yesterday.
-    current_day_to_check = date_objs[0] 
     
-    for date in date_objs:
-        if date == current_day_to_check:
-            streak += 1
-            current_day_to_check -= timedelta(days=1)
-        elif date > current_day_to_check:
-            continue # Skip duplicates on the same day
-        else:
-            break # Gap found
-            
+    # 4. Step backward one day at a time. The moment a date is missing, STOP.
+    while current_check in date_objs:
+        streak += 1
+        current_check -= timedelta(days=1)
+        
     return streak
     
 # --- 1. ACCESS THE TOKEN ---

@@ -38,7 +38,27 @@ def calculate_streak(content):
         current_check -= timedelta(days=1)
         
     return streak
+
+def calculate_points(content):
+    if not content:
+        return 0
     
+    # 1. Points for total entries
+    entry_count = content.count("DATE:")
+    total_points = entry_count * 10
+    
+    # 2. Points for total words (effort)
+    # Remove metadata to only count lyrics
+    just_lyrics = re.sub(r'(DATE|WORD|LYRICS):.*', '', content)
+    words = len(just_lyrics.split())
+    total_points += (words // 10) 
+    
+    # 3. Bonus for the current streak
+    current_streak = calculate_streak(content)
+    if current_streak >= 7: total_points += 100
+    elif current_streak >= 3: total_points += 50
+    
+    return total_points
 # --- 1. ACCESS THE TOKEN ---
 # This pulls the token from your Streamlit Secrets
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
@@ -693,51 +713,49 @@ with st.sidebar:
     st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
     st.info("Both apps are now synced! They use the same word list from App 1.")
 
-# --- 7. LOAD & STREAK LOGIC ---
+# --- 7. LOAD, STREAK & POINT LOGIC ---
 hist_file = get_github_file(HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
-# 1. Calculate Streak
+# 1. Calculate Stats
 user_streak = calculate_streak(full_text)
+user_points = calculate_points(full_text)
 
-# 2. Display Streak & Motivation
-col1, col2 = st.columns([1, 2])
+# 2. Shop Logic (Automatic Unlocks)
+unlocked_crown = user_points >= 500  
+title_icon = "👑" if unlocked_crown else "📝"
+
+# Update Page Title based on points
+st.title(f"{title_icon} Smart Rap Journal")
+
+# 3. Display Triple Dashboard
+col1, col2, col3 = st.columns([1, 1, 2])
+
 with col1:
-    if user_streak > 0:
-        st.metric(label="Writing Streak", value=f"{user_streak} Days", delta="🔥 Active")
-    else:
-        st.metric(label="Writing Streak", value="0 Days", delta="🧊 Start Today")
+    st.metric(label="Streak", value=f"{user_streak} Days", delta="🔥")
 
 with col2:
+    st.metric(label="Rap Credits", value=f"{user_points} RC", delta="💰")
+
+with col3:
     # Weekly Goal Progress Bar
     progress_to_goal = min(user_streak / 7, 1.0)
     st.progress(progress_to_goal, text=f"Weekly Goal: {user_streak}/7 Days")
 
-    # Dynamic Motivational Messages
-    if user_streak == 0:
-        st.error("🎤 **The Mic is Cold.** Record your first lines to start the fire.")
-    elif user_streak == 1:
-        st.info("🌱 **First Seed.** You've started the chain. Come back tomorrow.")
-    elif user_streak == 2:
-        st.info("⚖️ **Consistency.** Two days is a trend. Keep it moving.")
-    elif user_streak == 3:
-        st.info("🥉 **Bronze Status.** Three days is a habit. Don't break it now!")
-    elif user_streak == 4:
-        st.info("🏗️ **Building a Legacy.** You're out-working the competition.")
-    elif user_streak == 5:
-        st.success("🔥 **On Fire!** 5 days of bars. (Balloons Incoming!)")
-        st.balloons()
-    elif user_streak == 6:
-        st.success("💎 **Diamond Focus.** One more day for a full week.")
-    elif user_streak >= 7 and user_streak < 14:
-        st.success(f"🏆 **Weekly Warrior.** {user_streak} days. You're in the 1% now.")
-    elif user_streak >= 14:
-        st.success(f"👑 **God Mode.** {user_streak} Days. A total master of the craft.")
-        st.snow()
+# 4. Motivational Alert Box
+if user_streak == 0:
+    st.error("🎤 **The Mic is Cold.** Record your first lines to start the fire.")
+elif user_streak == 5:
+    st.success("🔥 **On Fire!** 5 days of bars. (Balloons Incoming!)")
+    st.balloons()
+elif user_streak >= 7:
+    st.success(f"🏆 **Weekly Warrior.** {user_streak} days. You're in the 1% now.")
+else:
+    st.info("⚡ **Keep Grinding.** Every entry adds to your Rap Credits!")
 
 st.divider()
 
-# 3. Load Existing Lyrics for the selected date
+# 5. Load Existing Lyrics for the selected date
 existing_lyrics = ""
 if f"DATE: {formatted_date}" in full_text:
     try:
@@ -750,11 +768,11 @@ if f"DATE: {formatted_date}" in full_text:
     except:
         existing_lyrics = ""
 
+
+
 # --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
 if "reset_count" not in st.session_state:
     st.session_state.reset_count = 0
-# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
-# This line (line 725) should be back at the far left margin
 if "reset_count" not in st.session_state:
     st.session_state.reset_count = 0
     

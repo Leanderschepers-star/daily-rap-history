@@ -639,10 +639,42 @@ if f"DATE: {formatted_date}" in full_text:
 user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350)
 
 if st.button("🚀 Save Entry & Next Day"):
-    # --- AUTO-CAPITALIZE EVERY LINE ---
+    # --- SMART CAPITALIZE: Only first letter of each line ---
     lines = user_lyrics.split('\n')
-    capitalized_lines = [line.strip().capitalize() for line in lines]
-    processed_lyrics = "\n".join(capitalized_lines)
+    processed_lines = []
+    for line in lines:
+        l = line.lstrip() # Remove leading spaces
+        if len(l) > 0:
+            processed_lines.append(l[0].upper() + l[1:])
+        else:
+            processed_lines.append("")
+    processed_lyrics = "\n".join(processed_lines)
+    
+    # --- SAVE TO GITHUB LOGIC ---
+    entries = full_text.split("------------------------------")
+    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
+    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
+    
+    updated_entries = []
+    found_date = False
+    for entry in entries:
+        if f"DATE: {formatted_date}" in entry:
+            updated_entries.append(new_entry_content)
+            found_date = True
+        elif entry.strip():
+            updated_entries.append(entry.strip() + "\n")
+
+    if not found_date:
+        final_history = new_entry_content + "------------------------------\n" + full_text
+    else:
+        final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
+
+    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
+    
+    # --- AUTO-JUMP TO NEXT DAY ---
+    st.session_state.current_date = selected_date + datetime.timedelta(days=1)
+    st.success(f"Saved! Moving to {st.session_state.current_date.strftime('%d/%m/%Y')}...")
+    st.rerun()
     
     # --- SAVE TO GITHUB LOGIC ---
     entries = full_text.split("------------------------------")

@@ -12,7 +12,6 @@ HISTORY_PATH = "history.txt"
 # --- 2. TIME & DATE ---
 belgium_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.datetime.now(belgium_tz)
-today_str = be_now.strftime('%d/%m/%Y')
 day_of_year = be_now.timetuple().tm_yday
 
 # --- 3. GITHUB HELPERS ---
@@ -602,9 +601,19 @@ daily_sentence = sentences[day_of_year % len(sentences)]
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
 
 st.title("🎤 Daily Rap Journal")
-st.write(f"### Today is {today_str}")
 
-# Display the word and prompt in a nice box
+# 📅 NEW: The Date Picker
+selected_date = st.date_input("Which day are you logging for?", value=be_now.date())
+formatted_date = selected_date.strftime('%d/%m/%Y')
+
+# Calculate the word for the SELECTED date (so rhymes match the day you picked)
+selected_day_of_year = selected_date.timetuple().tm_yday
+daily_word = words[selected_day_of_year % len(words)]
+daily_sentence = sentences[selected_day_of_year % len(sentences)]
+
+st.write(f"### Entry for: {formatted_date}")
+
+# Display the word and prompt for that specific date
 st.info(f"**WORD:** {daily_word['word'].upper()}  \n**RHYMES:** {daily_word.get('rhymes', '')}  \n**PROMPT:** {daily_sentence}")
 
 st.divider()
@@ -616,15 +625,14 @@ if st.button("🚀 Save Entry"):
     hist_file = get_github_file(HISTORY_PATH)
     old_hist = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
     
-    # Check if a log for today already exists
-    status = user_lyrics if user_lyrics.strip() else "(No lyrics recorded for today)"
+    status = user_lyrics if user_lyrics.strip() else "(No lyrics recorded)"
     
-    # Create the text entry
-    new_entry = f"DATE: {today_str}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n{'-'*30}\n\n"
+    # Create the text entry with the selected date
+    new_entry = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n{'-'*30}\n\n"
     
-    # Save to GitHub (Newest on top)
-    update_github_file(HISTORY_PATH, new_entry + old_hist, f"Journal Entry: {today_str}")
-    st.success("Your progress has been saved!")
+    # Logic: It still puts the newest SUBMISSION at the top
+    update_github_file(HISTORY_PATH, new_entry + old_hist, f"Journal Entry: {formatted_date}")
+    st.success(f"Saved entry for {formatted_date}!")
     st.balloons()
 
 # --- 8. HISTORY LOG ---

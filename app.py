@@ -637,54 +637,69 @@ if f"DATE: {formatted_date}" in full_text:
 
 # --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
 
-# We add a unique 'key' based on the date. 
-# When the date changes, Streamlit sees a new key and clears the box automatically.
+# 1. Initialize the text box in session state if it's not there
+if "lyrics_input" not in st.session_state:
+    st.session_state.lyrics_input = existing_lyrics
+
+# 2. The Text Area (Value is linked to session state)
 user_lyrics = st.text_area(
     "Write your lyrics:", 
-    value=existing_lyrics, 
-    height=350, 
-    key=f"input_{formatted_date}" 
+    value=st.session_state.lyrics_input, 
+    height=350,
+    key="main_lyrics_box"
 )
 
-if st.button("🚀 Save Entry & Next Day"):
-    # --- SMART CAPITALIZE: Only first letter of each line ---
-    lines = user_lyrics.split('\n')
-    processed_lines = []
-    for line in lines:
-        l = line.lstrip() 
-        if len(l) > 0:
-            # ONLY touch index 0. Leave the rest (including "I") exactly as is.
-            processed_lines.append(l[0].upper() + l[1:])
+# Create two columns for the buttons
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("🚀 Save Entry & Next Day"):
+        # --- STRICT FIRST-LETTER-ONLY CAPITALIZATION ---
+        processed_lines = []
+        for line in user_lyrics.split('\n'):
+            stripped = line.lstrip()
+            if stripped:
+                # ONLY change index 0 to upper. Leave everything else alone.
+                fixed_line = stripped[0].upper() + stripped[1:]
+                processed_lines.append(fixed_line)
+            else:
+                processed_lines.append("")
+        processed_lyrics = "\n".join(processed_lines)
+        
+        # --- GITHUB SAVE ---
+        entries = full_text.split("------------------------------")
+        status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
+        new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
+        
+        updated_entries = []
+        found_date = False
+        for entry in entries:
+            if f"DATE: {formatted_date}" in entry:
+                updated_entries.append(new_entry_content)
+                found_date = True
+            elif entry.strip():
+                updated_entries.append(entry.strip() + "\n")
+
+        if not found_date:
+            final_history = new_entry_content + "------------------------------\n" + full_text
         else:
-            processed_lines.append("")
-    processed_lyrics = "\n".join(processed_lines)
-    
-    # --- SAVE TO GITHUB LOGIC ---
-    entries = full_text.split("------------------------------")
-    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
-    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
-    
-    updated_entries = []
-    found_date = False
-    for entry in entries:
-        if f"DATE: {formatted_date}" in entry:
-            updated_entries.append(new_entry_content)
-            found_date = True
-        elif entry.strip():
-            updated_entries.append(entry.strip() + "\n")
+            final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
 
-    if not found_date:
-        final_history = new_entry_content + "------------------------------\n" + full_text
-    else:
-        final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
+        update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
+        
+        # --- THE MAGIC CLEAR & JUMP ---
+        # 1. Advance the date
+        st.session_state.current_date = selected_date + datetime.timedelta(days=1)
+        # 2. EMPTY the session state for the lyrics
+        st.session_state.lyrics_input = "" 
+        # 3. Force rerun
+        st.success("Saved! Box cleared. Moving to next day...")
+        st.rerun()
 
-    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    
-    # --- AUTO-JUMP TO NEXT DAY ---
-    # This changes the date, which changes the 'key' above, which empties the box.
-    st.session_state.current_date = selected_date + datetime.timedelta(days=1)
-    st.success(f"Saved! Moving to next day...")
-    st.rerun()
+with col2:
+    if st.button("🗑️ Clear Box"):
+        st.session_state.lyrics_input = ""
+        st.rerun()
 
 # --- 9. THE TIMELINE (STARTING DEC 19) ---
 st.divider()

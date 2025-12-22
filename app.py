@@ -693,13 +693,14 @@ with st.sidebar:
     st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
     st.info("Both apps are now synced! They use the same word list from App 1.")
 
-# --- 7. LOAD & CAPITALIZE LOGIC ---
+# --- 7. LOAD & STREAK LOGIC ---
 hist_file = get_github_file(HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
-# >>> PASTE STREAK CALCULATION & DISPLAY HERE <<<
+# 1. Calculate Streak
 user_streak = calculate_streak(full_text)
 
+# 2. Display Streak & Motivation
 col1, col2 = st.columns([1, 2])
 with col1:
     if user_streak > 0:
@@ -708,30 +709,40 @@ with col1:
         st.metric(label="Writing Streak", value="0 Days", delta="🧊 Start Today")
 
 with col2:
-    if user_streak >= 5:
-        st.success(f"Legendary! {user_streak} days of bars.")
+    # Weekly Goal Progress Bar
+    progress_to_goal = min(user_streak / 7, 1.0)
+    st.progress(progress_to_goal, text=f"Weekly Goal: {user_streak}/7 Days")
+
+    # Dynamic Motivational Messages
+    if user_streak == 0:
+        st.error("🎤 **The Mic is Cold.** Record your first lines to start the fire.")
+    elif user_streak == 1:
+        st.info("🌱 **First Seed.** You've started the chain. Come back tomorrow.")
+    elif user_streak == 2:
+        st.info("⚖️ **Consistency.** Two days is a trend. Keep it moving.")
+    elif user_streak == 3:
+        st.info("🥉 **Bronze Status.** Three days is a habit. Don't break it now!")
+    elif user_streak == 4:
+        st.info("🏗️ **Building a Legacy.** You're out-working the competition.")
+    elif user_streak == 5:
+        st.success("🔥 **On Fire!** 5 days of bars. (Balloons Incoming!)")
         st.balloons()
-    elif user_streak > 0:
-        st.info("The streak is live. Keep the momentum going!")
-    else:
-        st.warning("No entries recently. Ready to start a new chain?")
+    elif user_streak == 6:
+        st.success("💎 **Diamond Focus.** One more day for a full week.")
+    elif user_streak >= 7 and user_streak < 14:
+        st.success(f"🏆 **Weekly Warrior.** {user_streak} days. You're in the 1% now.")
+    elif user_streak >= 14:
+        st.success(f"👑 **God Mode.** {user_streak} Days. A total master of the craft.")
+        st.snow()
 
 st.divider()
-# >>> END OF STREAK SECTION <<<
 
-existing_lyrics = ""
-# --- 7. LOAD & CAPITALIZE LOGIC ---
-hist_file = get_github_file(HISTORY_PATH)
-full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
-
-# ... Streak code should be here ...
-
+# 3. Load Existing Lyrics for the selected date
 existing_lyrics = ""
 if f"DATE: {formatted_date}" in full_text:
     try:
         parts = full_text.split(f"DATE: {formatted_date}")
         relevant_part = parts[1].split("------------------------------")[0]
-        # FIX: Ensure all these lines are indented!
         lyric_start = relevant_part.find("LYRICS:") + 7
         existing_lyrics = relevant_part[lyric_start:].strip()
         if existing_lyrics == "(No lyrics recorded)": 
@@ -739,6 +750,9 @@ if f"DATE: {formatted_date}" in full_text:
     except:
         existing_lyrics = ""
 
+# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
+if "reset_count" not in st.session_state:
+    st.session_state.reset_count = 0
 # --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
 # This line (line 725) should be back at the far left margin
 if "reset_count" not in st.session_state:

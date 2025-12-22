@@ -10,23 +10,24 @@ def calculate_streak(content):
     if not content:
         return 0
     
-    # 1. Extract all dates (YYYY-MM-DD) using regex
+    # 1. Look for the DD/MM/YYYY format you actually use in history.txt
     import re
-    dates = set(re.findall(r'\d{4}-\d{2}-\d{2}', content))
+    dates = set(re.findall(r'\d{2}/\d{2}/\d{4}', content))
     if not dates:
         return 0
     
-    # 2. Convert to date objects and sort
-    date_objs = sorted([datetime.strptime(d, '%Y-%m-%d').date() for d in dates], reverse=True)
+    # 2. Convert to date objects (using the correct format) and sort
+    date_objs = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in dates], reverse=True)
     
     streak = 0
-    current_check = datetime.now().date()
+    # Use your Belgium timezone variable
+    current_check = be_now.date() 
     
-    # 3. Check if we wrote today or yesterday to keep the streak alive
+    # 3. Check if we wrote today or yesterday
     if date_objs[0] < current_check - timedelta(days=1):
-        return 0 # Streak broken
+        return 0 
         
-    # 4. Count backwards
+    # 4. Count backwards through the sorted list
     for date in date_objs:
         if date == current_check or date == current_check - timedelta(days=streak):
             if date == current_check - timedelta(days=streak):

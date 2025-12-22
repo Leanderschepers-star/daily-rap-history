@@ -639,15 +639,21 @@ if f"DATE: {formatted_date}" in full_text:
 user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350)
 
 if st.button("🚀 Save Entry & Next Day"):
-    # --- SMART CAPITALIZE: Only first letter of each line ---
+    # --- STRICT FIRST-LETTER-ONLY CAPITALIZATION ---
     lines = user_lyrics.split('\n')
     processed_lines = []
+    
     for line in lines:
-        l = line.lstrip() # Remove leading spaces
-        if len(l) > 0:
-            processed_lines.append(l[0].upper() + l[1:])
+        if line.strip():
+            # Get the first non-space character
+            content = line.lstrip()
+            # ONLY uppercase the first character, then attach the REST of the original line
+            # This avoids using .capitalize() which ruins the "I"s
+            new_line = content[0].upper() + content[1:]
+            processed_lines.append(new_line)
         else:
-            processed_lines.append("")
+            processed_lines.append("") # Keep empty lines
+            
     processed_lyrics = "\n".join(processed_lines)
     
     # --- SAVE TO GITHUB LOGIC ---
@@ -669,39 +675,13 @@ if st.button("🚀 Save Entry & Next Day"):
     else:
         final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
 
+    # Save to GitHub
     update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
     
-    # --- AUTO-JUMP TO NEXT DAY ---
+    # --- AUTO-JUMP ---
     st.session_state.current_date = selected_date + datetime.timedelta(days=1)
-    st.success(f"Saved! Moving to {st.session_state.current_date.strftime('%d/%m/%Y')}...")
+    st.success(f"Saved! Moving to next day...")
     st.rerun()
-    
-    # --- SAVE TO GITHUB LOGIC ---
-    entries = full_text.split("------------------------------")
-    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
-    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
-    
-    updated_entries = []
-    found_date = False
-    for entry in entries:
-        if f"DATE: {formatted_date}" in entry:
-            updated_entries.append(new_entry_content)
-            found_date = True
-        elif entry.strip():
-            updated_entries.append(entry.strip() + "\n")
-
-    if not found_date:
-        final_history = new_entry_content + "------------------------------\n" + full_text
-    else:
-        final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
-
-    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    
-    # --- AUTO-JUMP TO NEXT DAY ---
-    st.session_state.current_date = selected_date + datetime.timedelta(days=1)
-    st.success(f"Saved! Moving to {st.session_state.current_date.strftime('%d/%m/%Y')}...")
-    st.rerun()
-
 # --- 9. THE TIMELINE (STARTING DEC 19) ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")

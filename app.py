@@ -805,7 +805,7 @@ end_date = be_now.date()
 delta = end_date - start_date
 
 for i in range(delta.days + 1):
-    current_day = end_date - datetime.timedelta(days=i)
+    current_day = end_date - timedelta(days=i)
     day_str = current_day.strftime('%d/%m/%Y')
     
     temp_day_of_year = current_day.timetuple().tm_yday

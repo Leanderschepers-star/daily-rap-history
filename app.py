@@ -4,6 +4,37 @@ import requests
 import base64
 import pytz
 
+from datetime import datetime, timedelta
+
+def calculate_streak(content):
+    if not content:
+        return 0
+    
+    # 1. Extract all dates (YYYY-MM-DD) using regex
+    import re
+    dates = set(re.findall(r'\d{4}-\d{2}-\d{2}', content))
+    if not dates:
+        return 0
+    
+    # 2. Convert to date objects and sort
+    date_objs = sorted([datetime.strptime(d, '%Y-%m-%d').date() for d in dates], reverse=True)
+    
+    streak = 0
+    current_check = datetime.now().date()
+    
+    # 3. Check if we wrote today or yesterday to keep the streak alive
+    if date_objs[0] < current_check - timedelta(days=1):
+        return 0 # Streak broken
+        
+    # 4. Count backwards
+    for date in date_objs:
+        if date == current_check or date == current_check - timedelta(days=streak):
+            if date == current_check - timedelta(days=streak):
+                streak += 1
+        else:
+            break
+    return streak
+    
 # --- 1. ACCESS THE TOKEN ---
 # This pulls the token from your Streamlit Secrets
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
@@ -662,17 +693,31 @@ with st.sidebar:
 hist_file = get_github_file(HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
+# >>> PASTE STREAK CALCULATION & DISPLAY HERE <<<
+user_streak = calculate_streak(full_text)
+
+col1, col2 = st.columns([1, 2])
+with col1:
+    if user_streak > 0:
+        st.metric(label="Writing Streak", value=f"{user_streak} Days", delta="🔥 Active")
+    else:
+        st.metric(label="Writing Streak", value="0 Days", delta="🧊 Start Today")
+
+with col2:
+    if user_streak >= 5:
+        st.success(f"Legendary! {user_streak} days of bars.")
+        st.balloons()
+    elif user_streak > 0:
+        st.info("The streak is live. Keep the momentum going!")
+    else:
+        st.warning("No entries recently. Ready to start a new chain?")
+
+st.divider()
+# >>> END OF STREAK SECTION <<<
+
 existing_lyrics = ""
 if f"DATE: {formatted_date}" in full_text:
-    try:
-        parts = full_text.split(f"DATE: {formatted_date}")
-        relevant_part = parts[1].split("------------------------------")[0]
-        existing_lyrics = relevant_part.find("LYRICS:") + 7
-        existing_lyrics = relevant_part[existing_lyrics:].strip()
-        if existing_lyrics == "(No lyrics recorded)": existing_lyrics = ""
-    except:
-        existing_lyrics = ""
-
+    # ... rest of your code ...
 # --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
 
 # We create a unique ID for the text box. 

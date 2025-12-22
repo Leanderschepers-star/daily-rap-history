@@ -807,11 +807,11 @@ if st.button("🚀 Save Entry & Next Day"):
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-# We set the exact start date of your journey
-start_date = datetime(2024, 12, 19).date() 
+# UPDATED: Set to 2025 so it only shows the last few days
+start_date = datetime(2025, 12, 19).date() 
 end_date = be_now.date()
 
-# Calculate the difference in days
+# Calculate the difference in days (will be ~4 days now)
 delta = end_date - start_date
 
 # Loop only through the days since you started
@@ -836,7 +836,7 @@ for i in range(delta.days + 1):
         except:
             lyric_content = ""
 
-    # Only show the day if it's Dec 19 or later
+    # This will now only show about 4 expanders total
     with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
         if entry_found and lyric_content and "(No lyrics recorded)" not in lyric_content:
             st.text(lyric_content)

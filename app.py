@@ -6,59 +6,56 @@ import pytz
 
 from datetime import datetime, timedelta
 
+# --- FUNCTIONS: CALCULATIONS & REWARDS ---
+
 def calculate_streak(content):
     if not content or "DATE:" not in content:
         return 0
-    
     import re
-    # 1. Extract all unique dates from the file
+    # Extract unique dates
     found_dates = set(re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', content))
     if not found_dates:
         return 0
     
-    # 2. Convert string dates to actual Python date objects
+    # Convert to date objects
     date_objs = {datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates}
     
-    # 3. Start from Today (Belgium Time)
+    # Check for today/yesterday in Belgium
     today = datetime.now(pytz.timezone('Europe/Brussels')).date()
     yesterday = today - timedelta(days=1)
     
-    # --- THE STRICT CHECK ---
-    # If you haven't written today AND you didn't write yesterday, streak is dead.
     if today not in date_objs and yesterday not in date_objs:
         return 0
     
-    # Start counting from the most recent entry (either today or yesterday)
+    # Step backward to count streak
     current_check = today if today in date_objs else yesterday
     streak = 0
-    
-    # 4. Step backward one day at a time. The moment a date is missing, STOP.
     while current_check in date_objs:
         streak += 1
         current_check -= timedelta(days=1)
-        
     return streak
 
 def calculate_points(content):
     if not content:
         return 0
+    import re
     
-    import re  # <--- ADD THIS LINE HERE
-    
-    # 1. Points for total entries
+    # 1. Base Entry Points (10 RC per day)
     entry_count = content.count("DATE:")
     total_points = entry_count * 10
     
-    # 2. Points for total words (effort)
-    # This removes the metadata so we only count your actual bars
+    # 2. Wordsmith Bonus (2 RC for every 10 words)
+    # This removes metadata to count your actual bars
     just_lyrics = re.sub(r'(DATE|WORD|LYRICS):.*', '', content)
-    words = len(just_lyrics.split())
-    total_points += (words // 10) 
+    words_list = just_lyrics.split()
+    total_points += (len(words_list) // 10) * 2
     
-    # 3. Bonus for the current streak
-    current_streak = calculate_streak(content)
-    if current_streak >= 7: total_points += 100
-    elif current_streak >= 3: total_points += 50
+    # 3. Streak Multiplier
+    streak = calculate_streak(content)
+    total_points += (streak * 5)
+    
+    # 4. Big Milestones
+    if streak >= 7: total_points += 100
     
     return total_points
 
@@ -690,7 +687,111 @@ if synced_words and synced_sentences:
 daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
 # --- 6. DATE SELECTION & STATE ---
+# --- 6. PAGE SETUP & DASHBOARD ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
+
+# Date Logic
+if "current_date" not in st.session_state:
+    st.session_state.current_date = be_now.date()
+
+selected_date = st.date_input("Select Date:", value=st.session_state.current_date)
+st.session_state.current_date = selected_date 
+formatted_date = selected_date.strftime('%d/%m/%Y')
+
+# Load History Data
+hist_file = get_github_file(HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+
+# Calculate Stats
+user_streak = calculate_streak(full_text)
+user_points = calculate_points(full_text)
+
+# Shop Unlocks
+unlocked_crown = user_points >= 500  
+title_icon = "👑" if unlocked_crown else "🎤"
+st.title(f"{title_icon} Smart Rap Journal")
+
+# --- SIDEBAR & SHOP ---
+with st.sidebar:
+    st.title("🔗 Connections")
+    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
+    
+    st.divider()
+    st.subheader("🛒 Studio Shop")
+    st.metric("Wallet Balance", f"{user_points} RC")
+    
+    neon_price = 150
+    if user_points < neon_price:
+        st.button(f"🔒 Neon Theme ({neon_price} RC)", disabled=True)
+        st.caption(f"Need {neon_price - user_points} more RC to unlock.")
+    else:
+        activate_neon = st.checkbox("🌈 Activate Neon Mode")
+        if activate_neon:
+            st.markdown("""
+                <style>
+                .stApp { background-color: #0E1117; color: #00FFA2; }
+                [data-testid="stMetricValue"] { color: #00FFA2 !important; }
+                [data-testid="stMetricDelta"] { color: #00FFA2 !important; }
+                </style>
+                """, unsafe_content_html=True)
+
+# --- DAILY PROMPT & METRICS ---
+st.write(f"### Entry for: {formatted_date}")
+st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}")
+
+col1, col2, col3 = st.columns([1, 1, 2])
+with col1:
+    st.metric("Streak", f"{user_streak} Days", "🔥")
+with col2:
+    st.metric("Credits", f"{user_points} RC", "💰")
+with col3:
+    prog = min(user_streak / 7, 1.0)
+    st.progress(prog, text=f"Weekly Goal: {user_streak}/7")
+
+st.divider()
+
+# --- 8. WRITING AREA & SAVE ---
+existing_lyrics = ""
+if f"DATE: {formatted_date}" in full_text:
+    try:
+        parts = full_text.split(f"DATE: {formatted_date}")
+        relevant_part = parts[1].split("------------------------------")[0]
+        lyric_start = relevant_part.find("LYRICS:") + 7
+        existing_lyrics = relevant_part[lyric_start:].strip()
+        if existing_lyrics == "(No lyrics recorded)": existing_lyrics = ""
+    except: existing_lyrics = ""
+
+if "reset_count" not in st.session_state:
+    st.session_state.reset_count = 0
+
+box_key = f"lyrics_{formatted_date}_{st.session_state.reset_count}"
+user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350, key=box_key)
+
+if st.button("🚀 Save Entry & Next Day"):
+    processed_lines = [line.lstrip()[0].upper() + line.lstrip()[1:] if line.lstrip() else "" for line in user_lyrics.split('\n')]
+    processed_lyrics = "\n".join(processed_lines)
+    
+    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
+    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
+    
+    entries = full_text.split("------------------------------")
+    updated_entries = []
+    found_date = False
+    for entry in entries:
+        if f"DATE: {formatted_date}" in entry:
+            updated_entries.append(new_entry_content)
+            found_date = True
+        elif entry.strip():
+            updated_entries.append(entry.strip() + "\n")
+
+    final_history = (new_entry_content + "------------------------------\n" + full_text) if not found_date else ("------------------------------\n".join(updated_entries) + "------------------------------\n")
+    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
+    
+    st.session_state.reset_count += 1
+    st.session_state.current_date = selected_date + timedelta(days=1)
+    st.success("Saved! Moving to the next day...")
+    st.rerun()
+
 st.title("🎤 Smart Rap Journal")
 
 # Initialize the date in session state if it doesn't exist

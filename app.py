@@ -800,7 +800,7 @@ if st.button("🚀 Save Entry & Next Day"):
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-start_date = datetime.date(2025, 12, 19)
+start_date = datetime(2025, 12, 19).date()
 end_date = be_now.date()
 delta = end_date - start_date
 

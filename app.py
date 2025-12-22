@@ -655,10 +655,47 @@ if st.button("🚀 Save Entry"):
     st.success(f"Journal updated for {formatted_date}!")
     st.balloons()
 
-# --- 8. HISTORY VIEW ---
+# --- 8. HISTORY VIEW (THE SMART TIMELINE) ---
 st.divider()
-st.subheader("📜 Your Writing History")
+st.subheader("📜 Your Rap Timeline")
+
 hist_file = get_github_file(HISTORY_PATH)
 if hist_file:
-    display_history = base64.b64decode(hist_file['content']).decode('utf-8')
-    st.text_area("Archive:", display_history, height=400, disabled=True)
+    full_text = base64.b64decode(hist_file['content']).decode('utf-8')
+    # Split by our divider
+    entries = full_text.split("------------------------------")
+    
+    for entry in entries:
+        if "DATE:" in entry:
+            # Extract info for the labels
+            try:
+                # Splitting the text to find specific lines
+                lines = entry.strip().split("\n")
+                date_val = lines[0].replace("DATE: ", "")
+                word_val = lines[1].replace("WORD: ", "")
+                
+                # Finding where lyrics start
+                lyric_start_index = entry.find("LYRICS:") + 7
+                lyric_content = entry[lyric_start_index:].strip()
+
+                # Create an expandable box for each day
+                with st.expander(f"📅 {date_val} — Word: {word_val}"):
+                    # Look up the sentence for this date to display it
+                    try:
+                        temp_date = datetime.datetime.strptime(date_val, '%d/%m/%Y')
+                        temp_day_of_year = temp_date.timetuple().tm_yday
+                        hist_sentence = sentences[temp_day_of_year % len(sentences)]
+                        st.caption(f"Prompt: {hist_sentence}")
+                    except:
+                        pass
+                    
+                    st.divider()
+                    
+                    if "(No lyrics recorded)" in lyric_content or not lyric_content:
+                        st.error("🚫 You didn't write any lyrics this day.")
+                    else:
+                        st.markdown(f"**Your Bars:**\n\n{lyric_content}")
+            except:
+                continue
+else:
+    st.info("Your journal is empty. Save your first entry to see it here!")

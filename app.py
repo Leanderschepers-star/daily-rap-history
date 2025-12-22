@@ -598,50 +598,67 @@ daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
 
 # --- 6. THE WEBSITE UI ---
+# --- 6. THE WEBSITE UI ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
+st.title("🎤 Smart Rap Journal")
 
-st.title("🎤 Daily Rap Journal")
-
-# 📅 NEW: The Date Picker
-selected_date = st.date_input("Which day are you logging for?", value=be_now.date())
+# Date Picker
+selected_date = st.date_input("Select Date:", value=be_now.date())
 formatted_date = selected_date.strftime('%d/%m/%Y')
 
-# Calculate the word for the SELECTED date (so rhymes match the day you picked)
+# Recalculate word for that specific day
 selected_day_of_year = selected_date.timetuple().tm_yday
 daily_word = words[selected_day_of_year % len(words)]
 daily_sentence = sentences[selected_day_of_year % len(sentences)]
 
 st.write(f"### Entry for: {formatted_date}")
-
-# Display the word and prompt for that specific date
-st.info(f"**WORD:** {daily_word['word'].upper()}  \n**RHYMES:** {daily_word.get('rhymes', '')}  \n**PROMPT:** {daily_sentence}")
+st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}")
 
 st.divider()
 
-# --- 7. WRITING & SAVING ---
-user_lyrics = st.text_area("Write your lyrics below:", height=250, placeholder="Type your bars here...")
+# --- 7. SMART HISTORY LOGIC (REPLACE OR ADD) ---
+user_lyrics = st.text_area("Write your lyrics:", height=250, placeholder="Type here...")
 
 if st.button("🚀 Save Entry"):
+    # 1. Get the current history
     hist_file = get_github_file(HISTORY_PATH)
-    old_hist = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+    full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
     
-    status = user_lyrics if user_lyrics.strip() else "(No lyrics recorded)"
+    # 2. Split history into individual entries based on the divider
+    entries = full_text.split("------------------------------")
     
-    # Create the text entry with the selected date
-    new_entry = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n{'-'*30}\n\n"
+    # 3. Prepare the new entry text
+    status = user_lyrics.strip() if user_lyrics.strip() else "(No lyrics recorded)"
+    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
     
-    # Logic: It still puts the newest SUBMISSION at the top
-    update_github_file(HISTORY_PATH, new_entry + old_hist, f"Journal Entry: {formatted_date}")
-    st.success(f"Saved entry for {formatted_date}!")
+    # 4. Check if this date already exists in the history
+    updated_entries = []
+    found_date = False
+    
+    for entry in entries:
+        if f"DATE: {formatted_date}" in entry:
+            # If we found the date, replace it with the new content
+            updated_entries.append(new_entry_content)
+            found_date = True
+        elif entry.strip(): # Keep existing entries as they are
+            updated_entries.append(entry.strip() + "\n")
+
+    # 5. If date wasn't found, put the new entry at the TOP
+    if not found_date:
+        final_history = new_entry_content + "------------------------------\n" + full_text
+    else:
+        # Re-join all entries with the divider
+        final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
+
+    # 6. Save back to GitHub
+    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
+    st.success(f"Journal updated for {formatted_date}!")
     st.balloons()
 
-# --- 8. HISTORY LOG ---
+# --- 8. HISTORY VIEW ---
 st.divider()
 st.subheader("📜 Your Writing History")
 hist_file = get_github_file(HISTORY_PATH)
 if hist_file:
-    full_history = base64.b64decode(hist_file['content']).decode('utf-8')
-    # Display the history in a clean text block
-    st.text_area("Archive:", full_history, height=400, disabled=True)
-else:
-    st.write("No history found. Start writing today!")
+    display_history = base64.b64decode(hist_file['content']).decode('utf-8')
+    st.text_area("Archive:", display_history, height=400, disabled=True)

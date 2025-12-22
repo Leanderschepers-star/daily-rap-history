@@ -7,33 +7,41 @@ import pytz
 from datetime import datetime, timedelta
 
 def calculate_streak(content):
-    if not content:
+    if not content or "DATE:" not in content:
         return 0
     
-    # 1. Look for the DD/MM/YYYY format you actually use in history.txt
     import re
-    dates = set(re.findall(r'\d{2}/\d{2}/\d{4}', content))
-    if not dates:
+    # Look for DD/MM/YYYY specifically after the word "DATE: "
+    found_dates = set(re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', content))
+    
+    if not found_dates:
         return 0
     
-    # 2. Convert to date objects (using the correct format) and sort
-    date_objs = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in dates], reverse=True)
+    # Convert to date objects and sort newest to oldest
+    date_objs = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates], reverse=True)
+    
+    # Get the current date in Belgium
+    today = datetime.now(pytz.timezone('Europe/Brussels')).date()
+    yesterday = today - timedelta(days=1)
+    
+    # If the newest date in history isn't today or yesterday, streak is 0
+    if date_objs[0] < yesterday:
+        return 0
     
     streak = 0
-    # Use your Belgium timezone variable
-    current_check = be_now.date() 
+    # If we wrote today, start counting from today. 
+    # Otherwise, start counting from yesterday.
+    current_day_to_check = date_objs[0] 
     
-    # 3. Check if we wrote today or yesterday
-    if date_objs[0] < current_check - timedelta(days=1):
-        return 0 
-        
-    # 4. Count backwards through the sorted list
     for date in date_objs:
-        if date == current_check or date == current_check - timedelta(days=streak):
-            if date == current_check - timedelta(days=streak):
-                streak += 1
+        if date == current_day_to_check:
+            streak += 1
+            current_day_to_check -= timedelta(days=1)
+        elif date > current_day_to_check:
+            continue # Skip duplicates on the same day
         else:
-            break
+            break # Gap found
+            
     return streak
     
 # --- 1. ACCESS THE TOKEN ---

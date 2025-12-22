@@ -636,24 +636,27 @@ if f"DATE: {formatted_date}" in full_text:
         existing_lyrics = ""
 
 # --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
-user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350)
+
+# We add a unique 'key' based on the date. 
+# When the date changes, Streamlit sees a new key and clears the box automatically.
+user_lyrics = st.text_area(
+    "Write your lyrics:", 
+    value=existing_lyrics, 
+    height=350, 
+    key=f"input_{formatted_date}" 
+)
 
 if st.button("🚀 Save Entry & Next Day"):
-    # --- STRICT FIRST-LETTER-ONLY CAPITALIZATION ---
+    # --- SMART CAPITALIZE: Only first letter of each line ---
     lines = user_lyrics.split('\n')
     processed_lines = []
-    
     for line in lines:
-        if line.strip():
-            # Get the first non-space character
-            content = line.lstrip()
-            # ONLY uppercase the first character, then attach the REST of the original line
-            # This avoids using .capitalize() which ruins the "I"s
-            new_line = content[0].upper() + content[1:]
-            processed_lines.append(new_line)
+        l = line.lstrip() 
+        if len(l) > 0:
+            # ONLY touch index 0. Leave the rest (including "I") exactly as is.
+            processed_lines.append(l[0].upper() + l[1:])
         else:
-            processed_lines.append("") # Keep empty lines
-            
+            processed_lines.append("")
     processed_lyrics = "\n".join(processed_lines)
     
     # --- SAVE TO GITHUB LOGIC ---
@@ -675,13 +678,14 @@ if st.button("🚀 Save Entry & Next Day"):
     else:
         final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
 
-    # Save to GitHub
     update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
     
-    # --- AUTO-JUMP ---
+    # --- AUTO-JUMP TO NEXT DAY ---
+    # This changes the date, which changes the 'key' above, which empties the box.
     st.session_state.current_date = selected_date + datetime.timedelta(days=1)
     st.success(f"Saved! Moving to next day...")
     st.rerun()
+
 # --- 9. THE TIMELINE (STARTING DEC 19) ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")

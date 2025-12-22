@@ -622,14 +622,15 @@ motivation = [
     "Your potential is waiting for you to unleash it.", "Keep working hard and stay true to your vision.",
     "Success is the final destination on your journey of excellence."
 ]
-else:
-    # If the sync DID work, we use those instead!
+# --- OVERWRITE WITH SYNCED DATA IF AVAILABLE ---
+# We do this AFTER the lists are defined so we don't need 'else' logic
+if synced_words and synced_sentences:
     words = synced_words
     sentences = synced_sentences
+
 # --- 5. DATA EXECUTION ---
 daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
-
 # --- 6. DATE SELECTION & STATE ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
 st.title("🎤 Smart Rap Journal")

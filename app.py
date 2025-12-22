@@ -807,14 +807,19 @@ if st.button("🚀 Save Entry & Next Day"):
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-start_date = datetime(2024, 12, 19).date()
+# We set the exact start date of your journey
+start_date = datetime(2024, 12, 19).date() 
 end_date = be_now.date()
+
+# Calculate the difference in days
 delta = end_date - start_date
 
+# Loop only through the days since you started
 for i in range(delta.days + 1):
     current_day = end_date - timedelta(days=i)
     day_str = current_day.strftime('%d/%m/%Y')
     
+    # Get the word for that specific historical day
     temp_day_of_year = current_day.timetuple().tm_yday
     hist_word = words[temp_day_of_year % len(words)]
     
@@ -831,6 +836,7 @@ for i in range(delta.days + 1):
         except:
             lyric_content = ""
 
+    # Only show the day if it's Dec 19 or later
     with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
         if entry_found and lyric_content and "(No lyrics recorded)" not in lyric_content:
             st.text(lyric_content)

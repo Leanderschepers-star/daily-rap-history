@@ -597,12 +597,17 @@ motivation = [
 daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
 
-# --- 6. THE WEBSITE UI ---
+# --- 6. DATE SELECTION & STATE ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
 st.title("🎤 Smart Rap Journal")
 
-# Date Picker
-selected_date = st.date_input("Select Date:", value=be_now.date())
+# Initialize the date in session state if it doesn't exist
+if "current_date" not in st.session_state:
+    st.session_state.current_date = be_now.date()
+
+# Date Picker (now controlled by session state)
+selected_date = st.date_input("Select Date:", value=st.session_state.current_date)
+st.session_state.current_date = selected_date # Update state if user clicks manually
 formatted_date = selected_date.strftime('%d/%m/%Y')
 
 # Recalculate word for that specific day
@@ -615,35 +620,37 @@ st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}"
 
 st.divider()
 
-# --- 7. LOAD EXISTING LYRICS FOR EDITING ---
+# --- 7. LOAD & CAPITALIZE LOGIC ---
 hist_file = get_github_file(HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
-# Pre-fill the text box if lyrics already exist for this date
 existing_lyrics = ""
 if f"DATE: {formatted_date}" in full_text:
     try:
         parts = full_text.split(f"DATE: {formatted_date}")
         relevant_part = parts[1].split("------------------------------")[0]
-        lyric_start = relevant_part.find("LYRICS:") + 7
-        existing_lyrics = relevant_part[lyric_start:].strip()
-        if existing_lyrics == "(No lyrics recorded)":
-            existing_lyrics = ""
+        existing_lyrics = relevant_part.find("LYRICS:") + 7
+        existing_lyrics = relevant_part[existing_lyrics:].strip()
+        if existing_lyrics == "(No lyrics recorded)": existing_lyrics = ""
     except:
         existing_lyrics = ""
 
-# --- 8. WRITING & SAVING ---
-# Using the existing_lyrics as the 'value' allows for editing
-user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350, placeholder="Type here...")
+# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
+user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350)
 
-if st.button("🚀 Save Entry"):
+if st.button("🚀 Save Entry & Next Day"):
+    # --- AUTO-CAPITALIZE EVERY LINE ---
+    lines = user_lyrics.split('\n')
+    capitalized_lines = [line.strip().capitalize() for line in lines]
+    processed_lyrics = "\n".join(capitalized_lines)
+    
+    # --- SAVE TO GITHUB LOGIC ---
     entries = full_text.split("------------------------------")
-    status = user_lyrics.strip() if user_lyrics.strip() else "(No lyrics recorded)"
+    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
     new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
     
     updated_entries = []
     found_date = False
-    
     for entry in entries:
         if f"DATE: {formatted_date}" in entry:
             updated_entries.append(new_entry_content)
@@ -657,8 +664,11 @@ if st.button("🚀 Save Entry"):
         final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
 
     update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    st.success(f"Journal updated! Your layout is preserved.")
-    st.rerun() # Refresh to show changes
+    
+    # --- AUTO-JUMP TO NEXT DAY ---
+    st.session_state.current_date = selected_date + datetime.timedelta(days=1)
+    st.success(f"Saved! Moving to {st.session_state.current_date.strftime('%d/%m/%Y')}...")
+    st.rerun()
 
 # --- 9. THE TIMELINE (STARTING DEC 19) ---
 st.divider()

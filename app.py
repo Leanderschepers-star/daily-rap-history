@@ -598,7 +598,6 @@ daily_word = words[day_of_year % len(words)]
 daily_sentence = sentences[day_of_year % len(sentences)]
 
 # --- 6. THE WEBSITE UI ---
-# --- 6. THE WEBSITE UI ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
 st.title("🎤 Smart Rap Journal")
 
@@ -616,92 +615,83 @@ st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}"
 
 st.divider()
 
-# --- 7. SMART HISTORY LOGIC (REPLACE OR ADD) ---
-user_lyrics = st.text_area("Write your lyrics:", height=250, placeholder="Type here...")
+# --- 7. LOAD EXISTING LYRICS FOR EDITING ---
+hist_file = get_github_file(HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+
+# Pre-fill the text box if lyrics already exist for this date
+existing_lyrics = ""
+if f"DATE: {formatted_date}" in full_text:
+    try:
+        parts = full_text.split(f"DATE: {formatted_date}")
+        relevant_part = parts[1].split("------------------------------")[0]
+        lyric_start = relevant_part.find("LYRICS:") + 7
+        existing_lyrics = relevant_part[lyric_start:].strip()
+        if existing_lyrics == "(No lyrics recorded)":
+            existing_lyrics = ""
+    except:
+        existing_lyrics = ""
+
+# --- 8. WRITING & SAVING ---
+# Using the existing_lyrics as the 'value' allows for editing
+user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350, placeholder="Type here...")
 
 if st.button("🚀 Save Entry"):
-    # 1. Get the current history
-    hist_file = get_github_file(HISTORY_PATH)
-    full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
-    
-    # 2. Split history into individual entries based on the divider
     entries = full_text.split("------------------------------")
-    
-    # 3. Prepare the new entry text
     status = user_lyrics.strip() if user_lyrics.strip() else "(No lyrics recorded)"
     new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
     
-    # 4. Check if this date already exists in the history
     updated_entries = []
     found_date = False
     
     for entry in entries:
         if f"DATE: {formatted_date}" in entry:
-            # If we found the date, replace it with the new content
             updated_entries.append(new_entry_content)
             found_date = True
-        elif entry.strip(): # Keep existing entries as they are
+        elif entry.strip():
             updated_entries.append(entry.strip() + "\n")
 
-    # 5. If date wasn't found, put the new entry at the TOP
     if not found_date:
         final_history = new_entry_content + "------------------------------\n" + full_text
     else:
-        # Re-join all entries with the divider
         final_history = "------------------------------\n".join(updated_entries) + "------------------------------\n"
 
-    # 6. Save back to GitHub
     update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    st.success(f"Journal updated for {formatted_date}!")
-    st.balloons()
+    st.success(f"Journal updated! Your layout is preserved.")
+    st.rerun() # Refresh to show changes
 
-# --- 8. HISTORY VIEW (TIMELINE STARTING DEC 19) ---
+# --- 9. THE TIMELINE (STARTING DEC 19) ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-# 1. Define the Start Date
 start_date = datetime.date(2025, 12, 19)
 end_date = be_now.date()
-
-# 2. Get current history from GitHub
-hist_file = get_github_file(HISTORY_PATH)
-full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
-
-# 3. Generate the timeline range
 delta = end_date - start_date
+
 for i in range(delta.days + 1):
-    # Go backwards from today to the start date
     current_day = end_date - datetime.timedelta(days=i)
     day_str = current_day.strftime('%d/%m/%Y')
     
-    # Calculate word/sentence for this specific historical day
     temp_day_of_year = current_day.timetuple().tm_yday
     hist_word = words[temp_day_of_year % len(words)]
-    hist_sentence = sentences[temp_day_of_year % len(sentences)]
     
-    # Check if we have an entry in the text file for this date
     entry_found = False
     lyric_content = ""
     
     if f"DATE: {day_str}" in full_text:
         entry_found = True
-        # Extract the lyrics for this specific date from the file
         try:
             parts = full_text.split(f"DATE: {day_str}")
             relevant_part = parts[1].split("------------------------------")[0]
             lyric_start = relevant_part.find("LYRICS:") + 7
             lyric_content = relevant_part[lyric_start:].strip()
         except:
-            lyric_content = "(Error reading lyrics)"
+            lyric_content = ""
 
-    # 4. Display the Day in the UI
     with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
-        st.caption(f"Prompt: {hist_sentence}")
-        st.divider()
-        
         if entry_found and lyric_content and "(No lyrics recorded)" not in lyric_content:
-            st.markdown(f"**Your Bars:**\n\n{lyric_content}")
+            # Using st.text() or st.code() or st.markdown with preserve-newline
+            # st.text preserves your exact spacing and line breaks
+            st.text(lyric_content)
         else:
             st.error("🚫 No lyrics recorded for this day.")
-            if st.button(f"Write for {day_str}", key=f"btn_{day_str}"):
-                st.info("Scroll up to the 'Select Date' calendar and pick this date to fill it in!")

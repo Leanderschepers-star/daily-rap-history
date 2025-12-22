@@ -677,16 +677,11 @@ motivation = [
     "Your potential is waiting for you to unleash it.", "Keep working hard and stay true to your vision.",
     "Success is the final destination on your journey of excellence."
 ]
-# --- OVERWRITE WITH SYNCED DATA IF AVAILABLE ---
-# We do this AFTER the lists are defined so we don't need 'else' logic
+# --- 5. DATA EXECUTION ---
 if synced_words and synced_sentences:
     words = synced_words
     sentences = synced_sentences
 
-# --- 5. DATA EXECUTION ---
-daily_word = words[day_of_year % len(words)]
-daily_sentence = sentences[day_of_year % len(sentences)]
-# --- 6. DATE SELECTION & STATE ---
 # --- 6. PAGE SETUP & DASHBOARD ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
 
@@ -697,6 +692,11 @@ if "current_date" not in st.session_state:
 selected_date = st.date_input("Select Date:", value=st.session_state.current_date)
 st.session_state.current_date = selected_date 
 formatted_date = selected_date.strftime('%d/%m/%Y')
+
+# Recalculate word for the selected day
+selected_day_of_year = selected_date.timetuple().tm_yday
+daily_word = words[selected_day_of_year % len(words)]
+daily_sentence = sentences[selected_day_of_year % len(sentences)]
 
 # Load History Data
 hist_file = get_github_file(HISTORY_PATH)
@@ -750,7 +750,7 @@ with col3:
 
 st.divider()
 
-# --- 8. WRITING AREA & SAVE ---
+# --- 7. LOAD EXISTING LYRICS ---
 existing_lyrics = ""
 if f"DATE: {formatted_date}" in full_text:
     try:
@@ -761,6 +761,7 @@ if f"DATE: {formatted_date}" in full_text:
         if existing_lyrics == "(No lyrics recorded)": existing_lyrics = ""
     except: existing_lyrics = ""
 
+# --- 8. WRITING AREA & SAVE ---
 if "reset_count" not in st.session_state:
     st.session_state.reset_count = 0
 
@@ -768,150 +769,19 @@ box_key = f"lyrics_{formatted_date}_{st.session_state.reset_count}"
 user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350, key=box_key)
 
 if st.button("🚀 Save Entry & Next Day"):
-    processed_lines = [line.lstrip()[0].upper() + line.lstrip()[1:] if line.lstrip() else "" for line in user_lyrics.split('\n')]
-    processed_lyrics = "\n".join(processed_lines)
-    
-    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
-    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
-    
-    entries = full_text.split("------------------------------")
-    updated_entries = []
-    found_date = False
-    for entry in entries:
-        if f"DATE: {formatted_date}" in entry:
-            updated_entries.append(new_entry_content)
-            found_date = True
-        elif entry.strip():
-            updated_entries.append(entry.strip() + "\n")
-
-    final_history = (new_entry_content + "------------------------------\n" + full_text) if not found_date else ("------------------------------\n".join(updated_entries) + "------------------------------\n")
-    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    
-    st.session_state.reset_count += 1
-    st.session_state.current_date = selected_date + timedelta(days=1)
-    st.success("Saved! Moving to the next day...")
-    st.rerun()
-
-st.title("🎤 Smart Rap Journal")
-
-# Initialize the date in session state if it doesn't exist
-if "current_date" not in st.session_state:
-    st.session_state.current_date = be_now.date()
-
-# Date Picker (now controlled by session state)
-selected_date = st.date_input("Select Date:", value=st.session_state.current_date)
-st.session_state.current_date = selected_date # Update state if user clicks manually
-formatted_date = selected_date.strftime('%d/%m/%Y')
-
-# Recalculate word for that specific day
-selected_day_of_year = selected_date.timetuple().tm_yday
-daily_word = words[selected_day_of_year % len(words)]
-daily_sentence = sentences[selected_day_of_year % len(sentences)]
-
-st.write(f"### Entry for: {formatted_date}")
-st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}")
-
-st.divider()
-with st.sidebar:
-    st.title("🔗 Connections")
-    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
-    st.info("Both apps are now synced! They use the same word list from App 1.")
-
-# --- 7. LOAD, STREAK & POINT LOGIC ---
-hist_file = get_github_file(HISTORY_PATH)
-full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
-
-# 1. Calculate Stats
-user_streak = calculate_streak(full_text)
-user_points = calculate_points(full_text)
-
-# 2. Shop Logic (Automatic Unlocks)
-unlocked_crown = user_points >= 500  
-title_icon = "👑" if unlocked_crown else "📝"
-
-# Update Page Title based on points
-st.title(f"{title_icon} Smart Rap Journal")
-
-# 3. Display Triple Dashboard
-col1, col2, col3 = st.columns([1, 1, 2])
-
-with col1:
-    st.metric(label="Streak", value=f"{user_streak} Days", delta="🔥")
-
-with col2:
-    st.metric(label="Rap Credits", value=f"{user_points} RC", delta="💰")
-
-with col3:
-    # Weekly Goal Progress Bar
-    progress_to_goal = min(user_streak / 7, 1.0)
-    st.progress(progress_to_goal, text=f"Weekly Goal: {user_streak}/7 Days")
-
-# 4. Motivational Alert Box
-if user_streak == 0:
-    st.error("🎤 **The Mic is Cold.** Record your first lines to start the fire.")
-elif user_streak == 5:
-    st.success("🔥 **On Fire!** 5 days of bars. (Balloons Incoming!)")
-    st.balloons()
-elif user_streak >= 7:
-    st.success(f"🏆 **Weekly Warrior.** {user_streak} days. You're in the 1% now.")
-else:
-    st.info("⚡ **Keep Grinding.** Every entry adds to your Rap Credits!")
-
-st.divider()
-
-# 5. Load Existing Lyrics for the selected date
-existing_lyrics = ""
-if f"DATE: {formatted_date}" in full_text:
-    try:
-        parts = full_text.split(f"DATE: {formatted_date}")
-        relevant_part = parts[1].split("------------------------------")[0]
-        lyric_start = relevant_part.find("LYRICS:") + 7
-        existing_lyrics = relevant_part[lyric_start:].strip()
-        if existing_lyrics == "(No lyrics recorded)": 
-            existing_lyrics = ""
-    except:
-        existing_lyrics = ""
-
-
-
-# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
-if "reset_count" not in st.session_state:
-    st.session_state.reset_count = 0
-if "reset_count" not in st.session_state:
-    st.session_state.reset_count = 0
-    
-# --- 8. WRITING & THE "AUTO-JUMP" SAVE ---
-# We create a unique ID for the text box. 
-# If the date changes, the ID changes, and the box MUST clear.
-if "reset_count" not in st.session_state:
-    st.session_state.reset_count = 0
-
-box_key = f"lyrics_{formatted_date}_{st.session_state.reset_count}"
-
-user_lyrics = st.text_area(
-    "Write your lyrics:", 
-    value=existing_lyrics, 
-    height=350,
-    key=box_key
-)
-
-if st.button("🚀 Save Entry & Next Day"):
-    # --- SMART CAPITALIZE ---
     processed_lines = []
     for line in user_lyrics.split('\n'):
         stripped = line.lstrip()
         if stripped:
-            # Only uppercase the first letter, leave everything else (like "I") alone
             processed_lines.append(stripped[0].upper() + stripped[1:])
         else:
             processed_lines.append("")
     processed_lyrics = "\n".join(processed_lines)
     
-    # --- GITHUB SAVE ---
-    entries = full_text.split("------------------------------")
     status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
     new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
     
+    entries = full_text.split("------------------------------")
     updated_entries = []
     found_date = False
     for entry in entries:
@@ -928,19 +798,16 @@ if st.button("🚀 Save Entry & Next Day"):
 
     update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
     
-    # --- THE MAGIC CLEAR ---
-    # 1. Increment reset count to force a new text area ID
     st.session_state.reset_count += 1
-    # 2. Advance the date
     st.session_state.current_date = selected_date + timedelta(days=1)
-    
     st.success("Saved! Moving to the next day...")
     st.rerun()
-# --- 9. THE TIMELINE (STARTING DEC 19) ---
+
+# --- 9. THE TIMELINE ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 
-start_date = datetime(2025, 12, 19).date()
+start_date = datetime(2024, 12, 19).date()
 end_date = be_now.date()
 delta = end_date - start_date
 
@@ -966,8 +833,6 @@ for i in range(delta.days + 1):
 
     with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
         if entry_found and lyric_content and "(No lyrics recorded)" not in lyric_content:
-            # Using st.text() or st.code() or st.markdown with preserve-newline
-            # st.text preserves your exact spacing and line breaks
             st.text(lyric_content)
         else:
             st.error("🚫 No lyrics recorded for this day.")

@@ -71,7 +71,7 @@ HISTORY_PATH = "history.txt"
 
 # --- 2. TIME & DATE ---
 belgium_tz = pytz.timezone('Europe/Brussels')
-be_now = datetime.datetime.now(belgium_tz)
+be_now = datetime.now(belgium_tz)
 day_of_year = be_now.timetuple().tm_yday
 
 # --- 3. GITHUB HELPERS ---

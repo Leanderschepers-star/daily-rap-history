@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 # --- 1. CONFIG ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 # Double check these names on GitHub. Are they exactly like this?
-APP_1_REPO = "Leanderschepers-star/daily-rap-app" 
+APP_1_REPO = "leanderschepers-star/daily-rap-app" 
 APP_1_FILE = "streamlit_app.py" 
-REPO_NAME = "Leanderschepers-star/daily-rap-history"
+REPO_NAME = "leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
 
 belgium_tz = pytz.timezone('Europe/Brussels')

@@ -49,7 +49,7 @@ claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
 unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() <= today_date], reverse=True)
 
-# STREAK CALCULATION
+# STREAK 
 current_streak = 0
 if unique_dates:
     if (today_date - unique_dates[0]).days <= 1:
@@ -58,22 +58,12 @@ if unique_dates:
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
 
-# --- DEFINITIONS: SHOP VS GOALS ---
+# --- DEFINITIONS ---
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
-
 achievements = [
-    {
-        "id": "first", "name": "Rookie of the Year", "how": "Submit your very first entry in the journal.",
-        "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"
-    },
-    {
-        "id": "week", "name": "Weekly Grind", "how": "Reach a 7-day writing streak (no days missed).",
-        "req": current_streak >= 7, "reward_text": "250 RC + Silver Chain ⛓️", "rc": 250, "item": "Silver Chain ⛓️"
-    },
-    {
-        "id": "month", "name": "Legendary Status", "how": "Reach a 30-day writing streak.",
-        "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"
-    }
+    {"id": "first", "name": "Rookie of the Year", "how": "Submit 1st entry.", "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"},
+    {"id": "week", "name": "Weekly Grind", "how": "7-day streak.", "req": current_streak >= 7, "reward_text": "250 RC + Silver Chain ⛓️", "rc": 250, "item": "Silver Chain ⛓️"},
+    {"id": "month", "name": "Legendary Status", "how": "30-day streak.", "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"}
 ]
 
 inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
@@ -82,47 +72,66 @@ spent_points = sum([shop_items.get(p, 0) for p in purchases])
 user_points = (len(unique_dates) * 10) + bonus_points - spent_points
 
 # --- 4. UI ---
-st.set_page_config(page_title="Studio Journal", page_icon="🎤")
+st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
 
-# COSMETIC DISPLAY LOGIC (This makes it "Actual")
+# SIDEBAR: DASHBOARD + DISPLAY MANAGER
 with st.sidebar:
-    # 1. THE CAP: Displayed on your "Profile"
-    profile_emoji = "👤"
-    if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
-    if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
-    
-    st.title(f"{profile_emoji} Studio Dashboard")
+    st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"🔥 {current_streak} Days")
+    st.divider()
     
-    # 2. THE CAT: Appears as a pet in the sidebar if owned
-    if "Studio Cat 🐈" in inventory:
-        st.divider()
-        st.write("🐾 **Your Studio Pet:**")
-        st.write("🐈 *Purring on the mixing desk...*")
+    st.subheader("📦 Display Manager")
+    st.caption("Check items to show them in your studio")
+    
+    # Create a dictionary to track what the user wants to show
+    show_items = {}
+    for item in inventory:
+        show_items[item] = st.checkbox(f"Display {item}", value=True)
     
     st.divider()
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
-# 3. STUDIO DECORATIONS (Main Screen)
-if "Neon Sign 🏮" in inventory:
-    st.markdown("---")
-    st.markdown("<h3 style='text-align: center; color: pink;'>✨ STUDIO OPEN ✨</h3>", unsafe_content_code=True)
+# --- 5. THE ACTUAL WEBSITE SCREEN (THE STUDIO) ---
+# This section renders items directly on the page based on Display Manager
+st.title("🎤 My Recording Studio")
 
-t1, t2, t3, t4 = st.tabs(["🎤 Write", "📜 Vault", "🛒 Shop", "🏆 Goals"])
+# Physical Studio Layout (Items appear here)
+studio_cols = st.columns(5)
 
-# (Tab 1, 2, 3 logic remain the same for stability)
+if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
+    studio_cols[0].info("☕ **Coffee is Brewing**")
+if "Studio Cat 🐈" in inventory and show_items.get("Studio Cat 🐈"):
+    studio_cols[1].warning("🐈 **Cat is Napping**")
+if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
+    studio_cols[2].error("🏮 **ON AIR**")
+if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
+    studio_cols[3].success("🔊 **Bass Booming**")
+if "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
+    studio_cols[4].help("💿 **Top 100 Hit**")
+
+# Wearables (Emojis added to your header)
+wearables = ""
+if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢"): wearables += " 🧢"
+if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️"): wearables += " ⛓️"
+st.subheader(f"Current Artist Style: {wearables if wearables else 'Basic 👤'}")
+
+st.divider()
+
+# --- TABS ---
+t1, t2, t3, t4 = st.tabs(["✍️ Write Bars", "📂 Vault", "🏪 Shop", "🏆 Career"])
+
 with t1:
-    st.header("Daily Session")
-    if today_str in entry_map: st.success(f"✅ Secure in the vault.")
+    if today_str in entry_map: 
+        st.success("Today's session is locked in!")
     else:
-        lyrics = st.text_area("Drop your bars:", height=250)
-        if st.button("🚀 Submit"):
+        lyrics = st.text_area("Drop your fire here...", height=300)
+        if st.button("🚀 Record Session"):
             update_github_file(f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text)
             st.rerun()
 
 with t2:
-    st.header("Records")
+    st.header("The Vault")
     for i in range(7):
         target_str = (today_date - timedelta(days=i)).strftime('%d/%m/%Y')
         if target_str in entry_map:
@@ -130,39 +139,30 @@ with t2:
                 st.text(entry_map[target_str])
         else:
             with st.expander(f"❌ {target_str} (Missing)"):
-                st.write("Day missed.")
+                st.write("No recording found.")
 
 with t3:
-    st.header("The Shop")
-    cols = st.columns(2)
+    st.header("Shop")
+    cols = st.columns(3)
     for i, (item, price) in enumerate(shop_items.items()):
-        with cols[i % 2]:
+        with cols[i % 3]:
             if item in purchases: st.write(f"✅ {item} Owned")
-            else:
-                if st.button(f"Buy {item} ({price} RC)"):
-                    if user_points >= price:
-                        update_github_file(f"PURCHASE: {item}\n" + full_text)
-                        st.rerun()
+            elif st.button(f"Buy {item} ({price} RC)"):
+                if user_points >= price:
+                    update_github_file(f"PURCHASE: {item}\n" + full_text)
+                    st.rerun()
 
-# --- IMPROVED GOALS TAB (Tells you exactly what to do) ---
 with t4:
-    st.header("🏆 Career Milestones")
-    st.write("Earn items that prove your dedication.")
-    
+    st.header("Achievements")
     for a in achievements:
-        with st.container():
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.subheader(a['name'])
-                st.write(f"🎯 **Goal:** {a['how']}")
-                st.caption(f"Reward: {a['reward_text']}")
-            with c2:
-                if a['id'] in claimed:
-                    st.success("EARNED")
-                elif a['req']:
-                    if st.button("CLAIM", key=f"cl_{a['id']}"):
-                        update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
-                        st.rerun()
-                else:
-                    st.button("LOCKED", disabled=True, key=f"lk_{a['id']}")
-            st.divider()
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.write(f"**{a['name']}**")
+            st.caption(f"How: {a['how']} | Reward: {a['reward_text']}")
+        with c2:
+            if a['id'] in claimed: st.success("Claimed")
+            elif a['req']:
+                if st.button("Claim", key=a['id']):
+                    update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
+                    st.rerun()
+            else: st.write("🔒 Locked")

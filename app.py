@@ -93,10 +93,21 @@ def rebuild_and_save(new_map, new_pur, new_cla):
         content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 6. UI ---
+# --- 6. UI & SIDEBAR ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
 
-# --- UPDATE THE CSS SECTION ---
+with st.sidebar:
+    st.title("🕹️ Studio Control")
+    st.metric("Wallet", f"{user_points} RC")
+    st.metric("Streak", f"{current_streak} Days")
+    if st.button("📢 Test Phone Notif"):
+        send_notif("Mic Check!", "Connection to studio is live.")
+    st.divider()
+    # CRITICAL FIX: Defined before the mannequin uses it
+    show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
+    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
+
+# CSS for the Character
 st.markdown("""
 <style>
     @keyframes sync-float {
@@ -107,7 +118,7 @@ st.markdown("""
     .character-box {
         animation: sync-float 3s ease-in-out infinite;
         position: relative;
-        height: 380px; /* Taller for limbs */
+        height: 380px;
         width: 100%;
         background: rgba(255,255,255,0.03);
         border-radius: 20px;
@@ -116,21 +127,17 @@ st.markdown("""
         justify-content: center;
     }
     .body-layer { position: absolute; line-height: 1; display: flex; justify-content: center; width: 100%; }
-    
-    /* Vertical Positioning */
-    .hat   { font-size: 48px; z-index: 10; top: 38px; }
-    .face  { font-size: 60px; z-index: 5;  top: 75px; filter: grayscale(100%) brightness(1.6); }
-    .chain { font-size: 38px; z-index: 6;  top: 115px; }
-    .shirt { font-size: 85px; z-index: 4;  top: 125px; filter: grayscale(100%) brightness(1.2); }
-    .pants { font-size: 75px; z-index: 2;  top: 200px; filter: grayscale(100%) brightness(1.1); }
-    
-    /* Arms and Legs */
-    .arms  { font-size: 90px; z-index: 3;  top: 120px; filter: grayscale(100%) brightness(1.4); letter-spacing: 50px; padding-left: 50px;}
-    .legs  { font-size: 40px; z-index: 1;  top: 265px; filter: grayscale(100%) brightness(1.4); letter-spacing: 20px; padding-left: 20px;}
+    .hat   { font-size: 50px; z-index: 10; top: 35px; }
+    .face  { font-size: 60px; z-index: 5;  top: 70px; filter: grayscale(100%) brightness(1.6); }
+    .chain { font-size: 38px; z-index: 6;  top: 110px; }
+    .shirt { font-size: 85px; z-index: 4;  top: 120px; filter: grayscale(100%) brightness(1.2); }
+    .pants { font-size: 75px; z-index: 2;  top: 195px; filter: grayscale(100%) brightness(1.1); }
+    .arms  { font-size: 80px; z-index: 3;  top: 115px; filter: grayscale(100%) brightness(1.4); letter-spacing: 50px; padding-left: 50px;}
+    .legs  { font-size: 40px; z-index: 1;  top: 260px; filter: grayscale(100%) brightness(1.4); letter-spacing: 20px; padding-left: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- UPDATE THE MANNEQUIN SECTION (v3) ---
+# --- 7. VISUAL STUDIO ---
 v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1])
 with v3:
     cap_display = "🧢" if show_items.get("Rookie Cap 🧢") else ""
@@ -149,7 +156,7 @@ with v3:
     </div>
     """, unsafe_allow_html=True)
 
-# TABS
+# --- 8. TABS ---
 t1, t2, t3, t4 = st.tabs(["✍️ New Session", "📂 The Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
@@ -194,7 +201,7 @@ with t3:
                     st.rerun()
 
 with t4:
-    st.header("🏆 Career Achievements")
+    st.header("🏆 Career achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:

@@ -18,6 +18,8 @@ today_str = today_date.strftime('%d/%m/%Y')
 
 if "test_trigger" not in st.session_state:
     st.session_state["test_trigger"] = False
+if "show_reward" not in st.session_state:
+    st.session_state["show_reward"] = False
 
 def get_github_file(repo, path):
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -55,7 +57,7 @@ for b in blocks:
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
             if lyr_content: entry_map[d_str] = lyr_content
 
-# --- 3. EXPANDED SHOP & CAREER ---
+# --- 3. CALCULATIONS ---
 sidebar_customs = {
     "Brushed Steel Rack 🏗️": 500, "Wooden Side-Panels 🪵": 800,
     "Analog VU Meters 📈": 1200, "Neon Rack Glow 🟣": 2000,
@@ -121,17 +123,9 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
-rainbow_anim = ""
-if "LED Strips 🌈" in enabled_gear:
-    rainbow_anim = """
-    @keyframes rainbow { 0% { border-color: #ff0000; } 33% { border-color: #00ff00; } 66% { border-color: #0000ff; } 100% { border-color: #ff0000; } }
-    div[data-baseweb="textarea"] { border: 4px solid red !important; animation: rainbow 3s linear infinite !important; border-radius: 8px; }
-    """
-
 st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
 <style>
-    {rainbow_anim}
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
@@ -139,9 +133,23 @@ st.markdown(f"""
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
-    .status-tag {{ padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }}
-    .status-missed {{ background: #ff4b4b; color: white; }}
-    .status-recorded {{ background: #2ecc71; color: white; }}
+    /* Reward Overlay Animation */
+    @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
+    @keyframes shine {{ 0% {{ background-position: -200%; }} 100% {{ background-position: 200%; }} }}
+    
+    .reward-overlay {{
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.9); z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        animation: rewardFade 0.6s ease-out;
+    }}
+    .reward-card {{
+        background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728);
+        padding: 40px; border-radius: 20px; text-align: center;
+        box-shadow: 0 0 50px rgba(212, 175, 55, 0.6);
+        color: #000; font-weight: bold; width: 300px;
+        background-size: 200% auto; animation: shine 3s linear infinite;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -170,40 +178,50 @@ with st.sidebar:
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
     if sel_theme != active_theme: save_all(theme_to_save=sel_theme); st.rerun()
     
-    st.write("**Toggle Gear**")
-    new_gear_list = []
-    for g in gear_items.keys():
-        if g in purchases:
-            if st.checkbox(g, value=(g in enabled_gear), key=f"chk_{g}"):
-                new_gear_list.append(g)
-    if sorted(new_gear_list) != sorted(enabled_gear):
-        save_all(gear_to_save=new_gear_list); st.rerun()
-
-    # --- CHEST TESTER ---
     st.divider()
     if st.button("🎁 TEST CHEST ANIMATION", use_container_width=True):
         st.session_state["test_trigger"] = True
         st.rerun()
 
-# --- 6. MAIN UI ---
+# --- 6. CHEST SYSTEM ---
+if st.session_state["show_reward"]:
+    st.markdown(f"""
+        <div class="reward-overlay">
+            <div class="reward-card">
+                <h1 style="margin:0; font-size: 3rem;">🎁</h1>
+                <h2 style="color: black;">REWARD UNLOCKED</h2>
+                <hr style="border-color: black;">
+                <h1 style="font-size: 3.5rem; margin: 10px 0; color: black;">+250</h1>
+                <h3 style="color: black;">Rhyme Coins (RC)</h3>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    time.sleep(3.5)
+    st.session_state["show_reward"] = False
+    st.rerun()
+
 st.markdown("<h1 style='text-align:center;'>STUDIO CONSOLE</h1>", unsafe_allow_html=True)
 
-# Chest Logic (Real and Test)
-if st.session_state["test_trigger"] or (len(claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x)):
-    title = "🎁 TEST SESSION CHEST (No Reward)" if st.session_state["test_trigger"] else "🎁 OPEN SESSION CHEST"
-    if st.button(title, type="primary", use_container_width=True):
-        st.snow()
+can_open = (len(claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x))
+if st.session_state["test_trigger"] or can_open:
+    btn_label = "🎁 OPEN SESSION CHEST" if not st.session_state["test_trigger"] else "🎁 TEST CHEST ANIMATION"
+    if st.button(btn_label, type="primary", use_container_width=True):
+        # Rolling count simulation
+        with st.empty():
+            for i in range(0, 260, 20):
+                st.markdown(f"<h2 style='text-align:center; color:gold;'>Crunching Data: {i} RC...</h2>", unsafe_allow_html=True)
+                time.sleep(0.05)
+        
+        st.balloons()
         if not st.session_state["test_trigger"]:
             tasks_done.append(f"{today_str}_COMPLETION_RC250")
             save_all()
-            st.success("Session Complete! +250 RC")
-        else:
-            st.toast("Animation Test Complete!")
         
         st.session_state["test_trigger"] = False
-        time.sleep(2)
+        st.session_state["show_reward"] = True
         st.rerun()
 
+# --- 7. MAIN UI ---
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Session Words</h3><h2>📝 {today_word_count}</h2></div>', unsafe_allow_html=True)
@@ -220,56 +238,34 @@ with t_jou:
     data_dates = [datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()]
     if today_date not in data_dates: data_dates.append(today_date)
     curr_d, min_d = max(data_dates), min(data_dates)
-    
     while curr_d >= min_d:
         d_s = curr_d.strftime('%d/%m/%Y')
         content = entry_map.get(d_s, "").strip()
-        is_empty = not content
-        dot_char = "⚪" if is_empty else "🟢"
-        status_label = '<span class="status-tag status-missed">MISSED</span>' if is_empty else '<span class="status-tag status-recorded">RECORDED</span>'
-        
-        display_name = f"{dot_char} {d_s}"
-        if d_s == today_str: display_name += " (Today)"
-        
-        with st.expander(display_name, expanded=(d_s == today_str)):
-            st.markdown(f"Status: {status_label}", unsafe_allow_html=True)
-            new_txt = st.text_area(f"Lyrics for {d_s}", value=content, height=150, key=f"j_{d_s}")
+        dot = "⚪" if not content else "🟢"
+        with st.expander(f"{dot} {d_s} {'(Today)' if d_s == today_str else ''}"):
+            new_txt = st.text_area(f"Edit {d_s}", value=content, height=150, key=f"j_{d_s}")
             if st.button(f"Update {d_s}", key=f"b_{d_s}"):
                 entry_map[d_s] = new_txt; save_all(); st.rerun()
         curr_d -= timedelta(days=1)
 
 with t_shop:
-    st.subheader("Studio Rack Upgrades")
     sc = st.columns(2)
-    for i, (item, price) in enumerate(sidebar_customs.items()):
+    for i, (item, price) in enumerate(all_shop.items()):
         with sc[i%2]:
-            if item in purchases: st.success(f"Installed: {item}")
-            elif st.button(f"Buy {item} ({price} RC)", key=f"s_{i}"):
-                if user_points >= price: purchases.append(item); save_all(); st.rerun()
-    st.divider(); st.subheader("Recording Gear")
-    gc = st.columns(2)
-    for i, (item, price) in enumerate(gear_items.items()):
-        with gc[i%2]:
             if item in purchases: st.success(f"Owned: {item}")
-            elif st.button(f"Buy {item} ({price} RC)", key=f"g_{i}"):
+            elif st.button(f"Buy {item} ({price} RC)", key=f"s_{i}"):
                 if user_points >= price: purchases.append(item); save_all(); st.rerun()
 
 with t_car:
-    st.header("Achievements")
     achs = [
         {"id": "day1", "name": "Intern", "goal": "1 Session", "target": 1, "curr": active_sessions},
         {"id": "streak_3", "name": "Rookie", "goal": "3 Day Streak", "target": 3, "curr": current_streak},
-        {"id": "streak_7", "name": "Local", "goal": "7 Day Streak", "target": 7, "curr": current_streak},
-        {"id": "streak_14", "name": "Pro", "goal": "14 Day Streak", "target": 14, "curr": current_streak},
-        {"id": "words_100", "name": "Dabbler", "goal": "100 Words", "target": 100, "curr": total_words},
         {"id": "words_500", "name": "Writer", "goal": "500 Words", "target": 500, "curr": total_words},
-        {"id": "words_1000", "name": "Lyricist", "goal": "1k Words", "target": 1000, "curr": total_words},
-        {"id": "words_5000", "name": "Rap God", "goal": "5k Words", "target": 5000, "curr": total_words},
     ]
     for a in achs:
-        prog = min(a['curr'] / a['target'], 1.0)
         st.subheader(f"{a['name']} ({a['goal']})")
-        st.progress(prog)
-        if a['id'] in claimed: st.caption("Claimed ✅")
-        elif prog >= 1.0 and st.button(f"Claim Achievement", key=f"ach_{a['id']}"):
-            claimed.append(a['id']); save_all(); st.rerun()
+        st.progress(min(a['curr'] / a['target'], 1.0))
+        if a['id'] not in claimed and a['curr'] >= a['target']:
+            if st.button(f"Claim Achievement", key=f"ach_{a['id']}"):
+                claimed.append(a['id']); save_all(); st.rerun()
+            

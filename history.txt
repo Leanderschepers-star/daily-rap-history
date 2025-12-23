@@ -1,5 +1,4 @@
 ACTIVE_THEME: Underground UI 🧱
-ENABLED_GEAR: Acoustic Foam 🎚️
 PURCHASE: Acoustic Foam 🔇
 CLAIMED: day1
 CLAIMED: first

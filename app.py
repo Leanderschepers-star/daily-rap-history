@@ -93,7 +93,7 @@ def rebuild_and_save(new_map, new_pur, new_cla):
         content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 6. UI & SIDEBAR ---
+# --- 6. UI SETUP & SIDEBAR ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
 
 with st.sidebar:
@@ -103,11 +103,11 @@ with st.sidebar:
     if st.button("📢 Test Phone Notif"):
         send_notif("Mic Check!", "Connection to studio is live.")
     st.divider()
-    # CRITICAL FIX: Defined before the mannequin uses it
+    # Fixed: show_items is defined here so the Avatar section can access it below
     show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
-# CSS for the Character
+# CSS: Character Styling & Synced Animation
 st.markdown("""
 <style>
     @keyframes sync-float {
@@ -118,26 +118,39 @@ st.markdown("""
     .character-box {
         animation: sync-float 3s ease-in-out infinite;
         position: relative;
-        height: 380px;
+        height: 400px;
         width: 100%;
         background: rgba(255,255,255,0.03);
         border-radius: 20px;
         border: 1px solid #333;
         display: flex;
         justify-content: center;
+        overflow: hidden;
     }
     .body-layer { position: absolute; line-height: 1; display: flex; justify-content: center; width: 100%; }
-    .hat   { font-size: 50px; z-index: 10; top: 35px; }
-    .face  { font-size: 60px; z-index: 5;  top: 70px; filter: grayscale(100%) brightness(1.6); }
-    .chain { font-size: 38px; z-index: 6;  top: 110px; }
-    .shirt { font-size: 85px; z-index: 4;  top: 120px; filter: grayscale(100%) brightness(1.2); }
-    .pants { font-size: 75px; z-index: 2;  top: 195px; filter: grayscale(100%) brightness(1.1); }
-    .arms  { font-size: 80px; z-index: 3;  top: 115px; filter: grayscale(100%) brightness(1.4); letter-spacing: 50px; padding-left: 50px;}
-    .legs  { font-size: 40px; z-index: 1;  top: 260px; filter: grayscale(100%) brightness(1.4); letter-spacing: 20px; padding-left: 20px;}
+    
+    /* Vertical Positioning */
+    .hat   { font-size: 50px; z-index: 10; top: 32px; }
+    .face  { font-size: 60px; z-index: 5;  top: 65px; filter: grayscale(100%) brightness(1.6); }
+    .chain { font-size: 38px; z-index: 6;  top: 105px; }
+    .shirt { font-size: 85px; z-index: 4;  top: 115px; filter: grayscale(100%) brightness(1.2); }
+    .pants { font-size: 75px; z-index: 2;  top: 190px; filter: grayscale(100%) brightness(1.1); }
+    
+    /* Limbs */
+    .arms  { 
+        font-size: 45px; z-index: 3; top: 140px; 
+        filter: grayscale(100%) brightness(1.4); 
+        letter-spacing: 95px; padding-left: 95px;
+    }
+    .feet  { 
+        font-size: 30px; z-index: 1; top: 260px; 
+        filter: grayscale(100%) brightness(1.4); 
+        letter-spacing: 35px; padding-left: 35px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 7. VISUAL STUDIO ---
+# --- 7. AVATAR VISUAL ---
 v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1])
 with v3:
     cap_display = "🧢" if show_items.get("Rookie Cap 🧢") else ""
@@ -148,11 +161,11 @@ with v3:
         <div class="body-layer hat">{cap_display}</div>
         <div class="body-layer face">👦</div>
         <div class="body-layer chain">{chain_display}</div>
-        <div class="body-layer arms">💪💪</div>
+        <div class="body-layer arms">🖐️🖐️</div>
         <div class="body-layer shirt">👕</div>
         <div class="body-layer pants">👖</div>
-        <div class="body-layer legs">🦶🦶</div>
-        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Studio Avatar</p>
+        <div class="body-layer feet">👟👟</div>
+        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Studio Artist</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -201,7 +214,7 @@ with t3:
                     st.rerun()
 
 with t4:
-    st.header("🏆 Career achievements")
+    st.header("🏆 Career Achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:

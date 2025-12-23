@@ -100,9 +100,9 @@ themes = {
     "Blue Booth UI 🟦": "background: radial-gradient(circle, #001a33 0%, #0f0f0f 100%);"
 }
 
-# GEAR EFFECTS
-foam_style = "border: 4px double #333; padding: 10px; background: #111;" if "Acoustic Foam 🔇" in purchases else ""
-led_glow = "box-shadow: 0 0 15px #00ff88;" if "LED Strips 🌈" in purchases else ""
+# GEAR EFFECTS (Acoustic Foam visual logic)
+foam_style = "border: 5px double #444; padding: 15px; background: #0a0a0a; border-radius: 10px;" if "Acoustic Foam 🔇" in purchases else ""
+led_glow = "box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);" if "LED Strips 🌈" in purchases else ""
 
 st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
@@ -112,8 +112,8 @@ st.markdown(f"""
     .quest-item {{ padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #444; background: rgba(255,255,255,0.02); }}
     .ready {{ border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.1); }}
     .done {{ border-left-color: #00ff88; background: rgba(0, 255, 136, 0.1); color: #00ff88; }}
-    .inventory-box {{ background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; border: 1px dashed #555; margin: 5px; text-align: center; }}
-    .booth-area {{ {foam_style} }}
+    .inventory-box {{ background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; border: 1px dashed #555; margin: 5px; text-align: center; font-size: 0.8em; }}
+    .booth-container {{ {foam_style} }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -157,27 +157,27 @@ with st.sidebar:
                 save_all(); st.toast(f"💰 +{t['rc']} RC!"); st.rerun()
         else: st.markdown(f"<div class='quest-item'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
     
+    # ACTUAL CHEST
     if q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
         chest_placeholder = st.empty()
         if chest_placeholder.button("🎁 OPEN DAILY CHEST", use_container_width=True, type="primary"):
-            # ANIMATION SEQUENCE
             for msg in ["🥁 UNLOCKING...", "✨ SHUFFLING LOOT...", "🔥 ALMOST THERE..."]:
-                chest_placeholder.info(msg)
-                time.sleep(0.6)
-            
+                chest_placeholder.info(msg); time.sleep(0.7)
             tasks_done.append(f"{today_str}_COMPLETION_RC200")
             new_gear = next((g for g in gear_pool if g not in purchases), None)
-            
-            if new_gear:
-                purchases.append(new_gear)
-                st.balloons()
-                chest_placeholder.success(f"🎊 FOUND: {new_gear}!")
-            else:
-                chest_placeholder.success("🎊 +200 RC ADDED!")
-            
-            save_all()
-            time.sleep(2)
-            st.rerun()
+            if new_gear: purchases.append(new_gear); st.balloons(); chest_placeholder.success(f"🎊 FOUND: {new_gear}!")
+            else: chest_placeholder.success("🎊 +200 RC ADDED!")
+            save_all(); time.sleep(2); st.rerun()
+
+    # DEBUG TEST BUTTON
+    st.divider()
+    if st.button("🛠️ Debug: Test Chest Animation"):
+        test_box = st.empty()
+        for msg in ["🥁 TEST: DRUMROLL...", "✨ TEST: GENERATING...", "🎁 TEST: REVEAL!"]:
+            test_box.warning(msg); time.sleep(0.7)
+        st.balloons()
+        test_box.success("🎊 TEST COMPLETE: Imagine Gear Here!")
+        time.sleep(2); test_box.empty()
 
 # --- 7. TABS ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
@@ -189,7 +189,8 @@ with c3: st.markdown(f'<div class="stats-card"><h3>Rank</h3><h2>Lv.{len(claimed)
 t_rec, t_vau, t_shop, t_car = st.tabs(["✍️ Record Today", "📂 Timeline", "🏪 Shop", "🏆 Career"])
 
 with t_rec:
-    st.markdown('<div class="booth-area">', unsafe_allow_html=True)
+    # Applying the "Padded" soundproof style if owned
+    st.markdown('<div class="booth-container">', unsafe_allow_html=True)
     lyrics = st.text_area(f"Recording Booth: {today_str}", value=entry_map.get(today_str, ""), height=350)
     st.markdown('</div>', unsafe_allow_html=True)
     if st.button("🚀 Commit Today's Session"):
@@ -229,4 +230,4 @@ with t_car:
     
     st.divider()
     st.header("Career Milestones")
-    # ... (Achievements code same as before)
+    # Achievements logic (Day 1, Wordsmith, etc.) goes here as before

@@ -6,7 +6,7 @@ import pytz
 import re
 from datetime import datetime, timedelta
 
-# --- 1. CONFIG (Directly from your 1st App) ---
+# --- 1. CONFIG ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 APP_1_REPO = "Leanderschepers-star/daily-rap-app" 
 APP_1_FILE = "streamlit_app.py" 
@@ -18,7 +18,7 @@ be_now = datetime.now(belgium_tz)
 day_of_year = be_now.timetuple().tm_yday
 today_str = be_now.strftime('%d/%m/%Y')
 
-# --- 2. GITHUB & STATS HELPERS ---
+# --- 2. THE ENGINE ---
 def get_github_file(repo, path):
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -40,7 +40,6 @@ def get_synced_data():
     file_json = get_github_file(APP_1_REPO, APP_1_FILE)
     if file_json:
         content = base64.b64decode(file_json['content']).decode('utf-8')
-        # We look for the lists: words, sentences, and motivation
         w_match = re.search(r"words\s*=\s*(\[.*?\])", content, re.DOTALL)
         s_match = re.search(r"sentences\s*=\s*(\[.*?\])", content, re.DOTALL)
         m_match = re.search(r"motivation\s*=\s*(\[.*?\])", content, re.DOTALL)
@@ -63,10 +62,53 @@ def calculate_stats(content):
     while curr in date_objs:
         streak += 1
         curr -= timedelta(days=1)
-    # 10 RC per entry + 5 RC per day of streak
     earned = (content.count("DATE:") * 10) + (streak * 5)
     purchases = re.findall(r'PURCHASE: (.*)', content)
-    # Define your Shop Prices here
-    prices = {"Studio Cat": 300, "Golden Mic": 500, "Neon Theme": 150}
+    prices = {"Studio Cat": 300, "Neon Layout": 150}
     spent = sum(prices.get(item, 0) for item in purchases)
     return earned - spent, streak, purchases
+
+# --- 3. DATA PROCESSING ---
+words, sentences, motivation = get_synced_data()
+hist_file = get_github_file(REPO_NAME, HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+user_points, user_streak, user_inventory = calculate_stats(full_text)
+
+# --- 4. THE UI (SAFE RENDER) ---
+st.set_page_config(page_title="Rap Studio", page_icon="🎤")
+
+with st.sidebar:
+    st.title("🕹️ Studio Control")
+    st.metric("Wallet", f"{user_points} RC")
+    st.metric("Streak", f"{user_streak} Days")
+    st.divider()
+    st.subheader("🛒 Shop")
+    if "Studio Cat" not in user_inventory:
+        if st.button(f"Buy Studio Cat (300 RC)", disabled=(user_points < 300)):
+            update_github_file(HISTORY_PATH, "PURCHASE: Studio Cat\n" + full_text, "Bought Cat")
+            st.rerun()
+    else: st.info("🐱 Studio Cat Active")
+
+st.title("🎤 Rap Journal")
+
+# Logic to prevent UI crash if Sync fails
+if words:
+    dw = words[day_of_year % len(words)]
+    ds = sentences[day_of_year % len(sentences)]
+    dm = motivation[day_of_year % len(motivation)]
+    
+    st.header(dw['word'].upper())
+    st.info(f"📝 {ds}")
+    st.warning(f"🔥 {dm}")
+else:
+    st.error("⚠️ Syncing words from App 1...")
+    st.info("The UI is active, but I can't find your words yet. Check your GitHub Token.")
+    dw = {"word": "RETRY"} # Dummy data to prevent crash
+
+# Writing Area
+user_lyrics = st.text_area("Drop your bars:", height=300)
+if st.button("🚀 Save Bars"):
+    entry = f"DATE: {today_str}\nWORD: {dw['word']}\nLYRICS:\n{user_lyrics}\n"
+    update_github_file(HISTORY_PATH, entry + "------------------------------\n" + full_text)
+    st.success("Bars saved!")
+    st.rerun()

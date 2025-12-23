@@ -9,16 +9,15 @@ except:
     st.error("Secrets not found. Please set GITHUB_TOKEN in your Streamlit settings.")
     st.stop()
 
+# YOUR UPDATED URL
+MAIN_APP_URL = "https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app" 
 REPO_NAME = "leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
-MAIN_APP_URL = "https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app" 
 
-# TIME (STRICT BELGIUM)
 be_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.now(be_tz)
-today_str = be_now.strftime('%d/%m/%Y')
-day_of_year = be_now.timetuple().tm_yday
-yesterday_date = (be_now - timedelta(days=1)).date()
+today_date = be_now.date()
+today_str = today_date.strftime('%d/%m/%Y')
 
 # --- 2. GITHUB ENGINE ---
 def get_github_file(repo, path):
@@ -39,140 +38,106 @@ def update_github_file(content, msg="Update Content"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. SYNC ENGINE (REPAIRED) ---
-def get_daily_context():
-    # Try the most likely repo for your word list
-    target_repo = "leanderschepers-star/daily-rap-app"
-    file_json = get_github_file(target_repo, "streamlit_app.py")
-    if file_json:
-        content = base64.b64decode(file_json['content']).decode('utf-8')
-        # Cleaner Regex to find the lists
-        w_match = re.search(r"words\s*=\s*(\[.*?\])", content, re.DOTALL)
-        s_match = re.search(r"sentences\s*=\s*(\[.*?\])", content, re.DOTALL)
-        if w_match and s_match:
-            try:
-                # Use a safe dict for execution
-                namespace = {}
-                exec(f"w_list = {w_match.group(1)}", {}, namespace)
-                exec(f"s_list = {s_match.group(1)}", {}, namespace)
-                w = namespace['w_list']
-                s = namespace['s_list']
-                return w[day_of_year % len(w)]['word'], s[day_of_year % len(s)]
-            except: pass
-    return "MIC CHECK", "Spit some fire today."
-
-daily_word, daily_sentence = get_daily_context()
-
-# --- 4. DATA PARSING (STRICT) ---
+# --- 3. DATA PARSING ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
-# 1. Get ONLY lyrics entries (ignore purchases/claims for the history list)
+# Separate system logs from lyrics
 all_blocks = [b.strip() for b in re.split(r'-{3,}', full_text) if b.strip()]
 entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = re.findall(r'PURCHASE: (.*)', full_text)
 claimed = re.findall(r'CLAIMED: (.*)', full_text)
 
-# 2. Parse Valid Dates
-found_dates = []
+# Map entries to dates (Strictly ignore future dates here)
+entry_map = {}
 for e in entries_raw:
     m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
     if m:
-        d_obj = datetime.strptime(m.group(1), '%d/%m/%Y').date()
-        # Filter out accidental future dates
-        if d_obj <= be_now.date():
-            found_dates.append(d_obj)
+        date_str = m.group(1)
+        d_obj = datetime.strptime(date_str, '%d/%m/%Y').date()
+        if d_obj <= today_date: # Stop the "Future" entries bug
+            entry_map[date_str] = e
 
-unique_dates = sorted(list(set(found_dates)), reverse=True)
-
-# 3. Calculate Streak
+# Streak Logic
+unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
 current_streak = 0
 if unique_dates:
-    if unique_dates[0] >= yesterday_date:
+    if (today_date - unique_dates[0]).days <= 1:
         current_streak = 1
         for i in range(len(unique_dates)-1):
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
-    else: current_streak = 0
 
-# 4. Points
+# Points Math
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
-achievements = [{"id": "r1", "name": "First Bars", "req": len(unique_dates) >= 1, "reward": 50}, {"id": "s7", "name": "7 Day Streak", "req": current_streak >= 7, "reward": 200}]
-bonus_pts = sum([a['reward'] for a in achievements if a['id'] in claimed])
-spent_pts = sum([shop_items.get(p.strip(), 0) for p in purchases])
-user_points = (len(unique_dates) * 10) + bonus_pts - spent_pts
+user_points = (len(unique_dates) * 10) - sum([shop_items.get(p.strip(), 0) for p in purchases])
 
-# --- 5. UI ---
+# --- 4. UI ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤")
-
-col_a, col_b = st.columns([4, 1])
-col_b.link_button("🔙 Main App", MAIN_APP_URL)
 
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"🔥 {current_streak} Days")
-    if st.button("🔄 Force Refresh"):
-        st.cache_data.clear()
-        st.rerun()
+    st.divider()
+    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
+    if st.button("🔄 Refresh Data"): st.rerun()
 
 t1, t2, t3, t4 = st.tabs(["🎤 Write", "📜 Vault", "🛒 Shop", "🏆 Goals"])
 
+# TAB 1: DAILY ENTRY
 with t1:
-    st.header(f"Today: {daily_word.upper()}")
-    st.info(f"📝 {daily_sentence}")
-    
-    # Check if entry exists for today (STRICT CHECK)
-    if any(d.strftime('%d/%m/%Y') == today_str for d in unique_dates):
-        st.success("✅ Session completed for today! Check the Vault to edit.")
+    st.header("Today's Session")
+    if today_str in entry_map:
+        st.success(f"✅ Entry for {today_str} is secure in the vault.")
     else:
-        lyrics = st.text_area("Drop your bars:", height=250)
-        if st.button("🚀 Save Session"):
+        lyrics = st.text_area("Drop your bars for today:", height=250)
+        if st.button("🚀 Submit to Cloud"):
             if lyrics:
-                header = f"DATE: {today_str} | WORD: {daily_word}"
-                new_entry = f"{header}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text
-                update_github_file(new_entry, f"Entry {today_str}")
+                # Add word of the day manually if needed, or just save lyrics
+                new_entry = f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text
+                update_github_file(new_entry, f"Daily bars: {today_str}")
                 st.rerun()
 
+# TAB 2: THE VAULT (Including Missing Days)
 with t2:
-    st.header("The Vault")
-    if not entries_raw:
-        st.write("No lyrics recorded yet.")
-    else:
-        for i, entry in enumerate(entries_raw):
-            display_date = entry.splitlines()[0].replace("DATE: ", "")
-            # Prevent showing weird claimed tags as titles
-            if "CLAIMED" in display_date: continue 
-            
-            with st.expander(f"📅 {display_date}"):
-                edit_area = st.text_area("Edit entry:", value=entry, height=200, key=f"v_{i}")
-                if st.button("Save Edit", key=f"b_{i}"):
-                    update_github_file(full_text.replace(entry, edit_area))
+    st.header("Historical Records")
+    st.caption("Last 7 days of activity:")
+    
+    for i in range(7):
+        target_date = today_date - timedelta(days=i)
+        target_str = target_date.strftime('%d/%m/%Y')
+        
+        if target_str in entry_map:
+            with st.expander(f"📅 {target_str}"):
+                content = entry_map[target_str]
+                edited_content = st.text_area("Edit recorded bars:", value=content, height=150, key=f"v_edit_{i}")
+                if st.button("Update Entry", key=f"v_btn_{i}"):
+                    update_github_file(full_text.replace(content, edited_content))
+                    st.success("Updated!")
                     st.rerun()
-
-with t3:
-    st.header("Studio Store")
-    c1, c2 = st.columns(2)
-    for i, (item, price) in enumerate(shop_items.items()):
-        slot = c1 if i % 2 == 0 else c2
-        with slot:
-            if item in [p.strip() for p in purchases]:
-                st.write(f"✅ {item} (Owned)")
-            else:
-                if st.button(f"Buy {item} ({price} RC)"):
-                    if user_points >= price:
-                        update_github_file(f"PURCHASE: {item}\n" + full_text, f"Bought {item}")
+        else:
+            with st.expander(f"❌ {target_str} (No Entry Found)", expanded=False):
+                st.error("Missing data for this date.")
+                retro_lyrics = st.text_area("Recover missed bars:", placeholder="What did you write this day?", key=f"v_miss_{i}")
+                if st.button("Fix This Day", key=f"v_rec_{i}"):
+                    if retro_lyrics:
+                        recovered = f"DATE: {target_str}\nLYRICS:\n{retro_lyrics}\n" + "-"*30 + "\n"
+                        update_github_file(recovered + full_text, f"Recovered entry for {target_str}")
                         st.rerun()
-                    else: st.error("Not enough RC!")
+
+# TAB 3 & 4: (Full Shop and Goals logic here)
+with t3:
+    st.header("The Shop")
+    for item, price in shop_items.items():
+        if item not in [p.strip() for p in purchases]:
+            if st.button(f"Buy {item} ({price} RC)"):
+                if user_points >= price:
+                    update_github_file(f"PURCHASE: {item}\n" + full_text)
+                    st.rerun()
+        else: st.write(f"✅ {item} Owned")
 
 with t4:
     st.header("Achievements")
-    for a in achievements:
-        ca, cb = st.columns([3, 1])
-        ca.write(f"**{a['name']}** (+{a['reward']} RC)")
-        if a['id'] in claimed: cb.write("Claimed")
-        elif a['req']:
-            if cb.button("Claim", key=a['id']):
-                update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
-                st.rerun()
-        else: cb.write("🔒 Locked")
+    st.write(f"**Total Sessions:** {len(unique_dates)}")
+    st.write(f"**Current Streak:** {current_streak} days")

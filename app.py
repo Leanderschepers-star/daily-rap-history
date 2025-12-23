@@ -99,9 +99,10 @@ with st.sidebar:
     if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
 
     st.title(f"{profile_emoji} Studio Control")
-    col1, col2 = st.columns(2)
-    col1.metric("Wallet", f"{user_points} RC")
-    col2.metric("Streak", f"🔥 {current_streak} Days")
+    
+    # Replaced st.metric with custom markdown to prevent "..." cutting off text
+    st.markdown(f"### 💰 Wallet: **{user_points} RC**")
+    st.markdown(f"### 🔥 Streak: **{current_streak} Days**")
     
     st.divider()
     st.write(f"📈 **Studio Level: {studio_level}**")
@@ -110,6 +111,7 @@ with st.sidebar:
     
     st.divider()
     st.subheader("📦 Display Manager")
+    st.caption("Select items to show in your studio:")
     show_items = {}
     if not inventory:
         st.write("No items yet. Visit the Shop!")
@@ -123,13 +125,11 @@ with st.sidebar:
         st.rerun()
 
 # --- 5. MAIN STUDIO SCREEN ---
-# Wearable emojis in header
 wearables = ""
 if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢"): wearables += " 🧢"
 if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️"): wearables += " ⛓️"
 st.title(f"🎤 My Studio{wearables}")
 
-# Physical Decor Layout
 studio_cols = st.columns(5)
 if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
     studio_cols[0].info("☕ **Brewing...**")

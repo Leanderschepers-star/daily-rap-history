@@ -28,7 +28,7 @@ def get_github_file(repo, path):
     except: return None
     return None
 
-def update_github_file(content, msg="Update Content"):
+def update_github_file(content, msg="Update"):
     file_data = get_github_file(REPO_NAME, HISTORY_PATH)
     sha = file_data['sha'] if file_data else None
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{HISTORY_PATH}"
@@ -37,7 +37,7 @@ def update_github_file(content, msg="Update Content"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA PARSING & ECONOMY ---
+# --- 3. DATA PARSING ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
@@ -46,11 +46,10 @@ entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
-# Map entries to dates
 entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
-
-# Streak Logic
 unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() <= today_date], reverse=True)
+
+# STREAK CALCULATION
 current_streak = 0
 if unique_dates:
     if (today_date - unique_dates[0]).days <= 1:
@@ -60,38 +59,24 @@ if unique_dates:
             else: break
 
 # --- DEFINITIONS: SHOP VS GOALS ---
-shop_items = {
-    "Coffee Machine ☕": 150, 
-    "Studio Cat 🐈": 300, 
-    "Neon Sign 🏮": 400, 
-    "Subwoofer 🔊": 800, 
-    "Golden Mic 🎤": 1000
-}
+shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
 
-# Achievements can give Credits OR Items (or both)
 achievements = [
     {
-        "id": "first", "name": "Rookie of the Year", "req": len(unique_dates) >= 1, 
-        "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"
+        "id": "first", "name": "Rookie of the Year", "how": "Submit your very first entry in the journal.",
+        "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"
     },
     {
-        "id": "week", "name": "Weekly Grind", "req": current_streak >= 7, 
-        "reward_text": "250 RC + Silver Chain ⛓️", "rc": 250, "item": "Silver Chain ⛓️"
+        "id": "week", "name": "Weekly Grind", "how": "Reach a 7-day writing streak (no days missed).",
+        "req": current_streak >= 7, "reward_text": "250 RC + Silver Chain ⛓️", "rc": 250, "item": "Silver Chain ⛓️"
     },
     {
-        "id": "month", "name": "Legendary Status", "req": current_streak >= 30, 
-        "reward_text": "Platinum Plaque 💿 (Exclusive)", "rc": 0, "item": "Platinum Plaque 💿"
-    },
-    {
-        "id": "mogul", "name": "Studio Mogul", "req": len(purchases) >= 4, 
-        "reward_text": "1000 RC + CEO Desk 💼", "rc": 1000, "item": "CEO Desk 💼"
+        "id": "month", "name": "Legendary Status", "how": "Reach a 30-day writing streak.",
+        "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"
     }
 ]
 
-# Inventory Building
 inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
-
-# Points Calculation
 bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
 spent_points = sum([shop_items.get(p, 0) for p in purchases])
 user_points = (len(unique_dates) * 10) + bonus_points - spent_points
@@ -99,23 +84,36 @@ user_points = (len(unique_dates) * 10) + bonus_points - spent_points
 # --- 4. UI ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤")
 
+# COSMETIC DISPLAY LOGIC (This makes it "Actual")
 with st.sidebar:
-    st.title("🕹️ Studio Control")
+    # 1. THE CAP: Displayed on your "Profile"
+    profile_emoji = "👤"
+    if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
+    if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
+    
+    st.title(f"{profile_emoji} Studio Dashboard")
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"🔥 {current_streak} Days")
-    st.divider()
-    st.subheader("📦 Inventory")
-    if not inventory: st.caption("Empty...")
-    else:
-        for item in inventory: st.write(item)
+    
+    # 2. THE CAT: Appears as a pet in the sidebar if owned
+    if "Studio Cat 🐈" in inventory:
+        st.divider()
+        st.write("🐾 **Your Studio Pet:**")
+        st.write("🐈 *Purring on the mixing desk...*")
+    
     st.divider()
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
+# 3. STUDIO DECORATIONS (Main Screen)
+if "Neon Sign 🏮" in inventory:
+    st.markdown("---")
+    st.markdown("<h3 style='text-align: center; color: pink;'>✨ STUDIO OPEN ✨</h3>", unsafe_content_code=True)
+
 t1, t2, t3, t4 = st.tabs(["🎤 Write", "📜 Vault", "🛒 Shop", "🏆 Goals"])
 
-# TAB 1 & 2 (Logic remains same as previous stable version)
+# (Tab 1, 2, 3 logic remain the same for stability)
 with t1:
-    st.header("Today's Session")
+    st.header("Daily Session")
     if today_str in entry_map: st.success(f"✅ Secure in the vault.")
     else:
         lyrics = st.text_area("Drop your bars:", height=250)
@@ -129,40 +127,42 @@ with t2:
         target_str = (today_date - timedelta(days=i)).strftime('%d/%m/%Y')
         if target_str in entry_map:
             with st.expander(f"📅 {target_str}"):
-                st.text_area("Edit:", value=entry_map[target_str], key=f"v{i}")
-                if st.button("Update", key=f"b{i}"): st.rerun()
+                st.text(entry_map[target_str])
         else:
             with st.expander(f"❌ {target_str} (Missing)"):
-                retro = st.text_area("Recover:", key=f"m{i}")
-                if st.button("Fix", key=f"r{i}"): st.rerun()
+                st.write("Day missed.")
 
-# --- TAB 3: SHOP (Purchasable Only) ---
 with t3:
-    st.header("Store")
-    st.info("Spend your earned RC on studio upgrades.")
+    st.header("The Shop")
     cols = st.columns(2)
     for i, (item, price) in enumerate(shop_items.items()):
         with cols[i % 2]:
-            if item in purchases: st.write(f"✅ {item} (Owned)")
+            if item in purchases: st.write(f"✅ {item} Owned")
             else:
                 if st.button(f"Buy {item} ({price} RC)"):
                     if user_points >= price:
                         update_github_file(f"PURCHASE: {item}\n" + full_text)
                         st.rerun()
 
-# --- TAB 4: GOALS (Unlocks & Rewards) ---
+# --- IMPROVED GOALS TAB (Tells you exactly what to do) ---
 with t4:
     st.header("🏆 Career Milestones")
-    st.write("Some items cannot be bought—they must be earned.")
+    st.write("Earn items that prove your dedication.")
+    
     for a in achievements:
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.subheader(a['name'])
-            st.write(f"Reward: **{a['reward_text']}**")
-        with c2:
-            if a['id'] in claimed: st.success("EARNED")
-            elif a['req']:
-                if st.button("CLAIM", key=f"cl_{a['id']}"):
-                    update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
-                    st.rerun()
-            else: st.button("LOCKED", disabled=True, key=f"lk_{a['id']}")
+        with st.container():
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.subheader(a['name'])
+                st.write(f"🎯 **Goal:** {a['how']}")
+                st.caption(f"Reward: {a['reward_text']}")
+            with c2:
+                if a['id'] in claimed:
+                    st.success("EARNED")
+                elif a['req']:
+                    if st.button("CLAIM", key=f"cl_{a['id']}"):
+                        update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
+                        st.rerun()
+                else:
+                    st.button("LOCKED", disabled=True, key=f"lk_{a['id']}")
+            st.divider()

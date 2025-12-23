@@ -119,7 +119,7 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🔗 External Links")
-    st.markdown("[🎤 Open Daily Bars & Prompts](https://daily-rap-app.streamlit.app)")
+    st.markdown("[🎤 Open Daily Bars & Prompts](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
     
     st.divider()
     st.subheader("🎨 Studio Theme")
@@ -138,6 +138,11 @@ with st.sidebar:
     tasks_claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
     gear_pool = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
     
+    # Visual Progression for Chest
+    q_count = len(tasks_claimed_today)
+    st.write(f"Quest Progress: {q_count}/3")
+    st.progress(q_count / 3)
+    
     for t in daily_tasks:
         t_key = f"{today_str}_{t['id']}_RC{t['rc']}"
         is_done = any(t['id'] in x for x in tasks_done if today_str in x)
@@ -148,18 +153,22 @@ with st.sidebar:
                 save_all(); st.toast(f"💰 +{t['rc']} RC!"); st.rerun()
         else: st.markdown(f"<div class='quest-item'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
     
-    if len(tasks_claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
-        if st.button("🎁 CLAIM DAILY CHEST (+200 RC + GEAR)", use_container_width=True, type="primary"):
+    if q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
+        st.success("Chest Ready! 🎁")
+        if st.button("🎁 OPEN DAILY CHEST", use_container_width=True, type="primary"):
             tasks_done.append(f"{today_str}_COMPLETION_RC200")
             new_gear = next((g for g in gear_pool if g not in purchases), None)
             if new_gear:
                 purchases.append(new_gear)
                 st.balloons(); st.toast(f"🎁 UNLOCKED: {new_gear}!")
             else:
-                st.toast("🎁 +200 RC! (All Gear Collected)")
+                st.toast("🎁 +200 RC!")
             save_all(); st.rerun()
+    elif any("COMPLETION" in x for x in tasks_done if today_str in x):
+        st.info("Today's Chest Claimed ✅")
 
 # --- 7. TABS ---
+# (Rest of the code: Stats cards, Tabs for Record, Timeline, Shop, Career remain the same)
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak} Days</h2></div>', unsafe_allow_html=True)
@@ -199,9 +208,8 @@ with t_shop:
 
 with t_car:
     st.header("Studio Inventory")
-    all_gear = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
     inv_cols = st.columns(5)
-    for idx, gear in enumerate(all_gear):
+    for idx, gear in enumerate(gear_pool):
         with inv_cols[idx]:
             if gear in purchases: st.markdown(f"<div class='inventory-box'>{gear}</div>", unsafe_allow_html=True)
             else: st.markdown(f"<div class='inventory-box' style='opacity:0.3;'>🔒 Locked</div>", unsafe_allow_html=True)
@@ -223,4 +231,3 @@ with t_car:
             if st.button(f"Unlock Reward", key=f"ac_{a['id']}"):
                 claimed.append(a['id']); save_all(); st.rerun()
         else: st.write(f"Progress: {a['curr']} / {a['target']}")
-        st.divider()

@@ -36,7 +36,6 @@ full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json 
 
 purchases = list(set(re.findall(r'PURCHASE: (.*)', full_text)))
 claimed = list(set(re.findall(r'CLAIMED: (.*)', full_text)))
-# Find the saved theme preference
 current_theme_match = re.search(r'ACTIVE_THEME: (.*)', full_text)
 active_theme = current_theme_match.group(1) if current_theme_match else "Default Dark"
 
@@ -53,7 +52,7 @@ for b in blocks:
 
 db_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
 
-# Streak Logic
+# Logic
 current_streak = 0
 if db_dates:
     if (be_now.date() - db_dates[0]).days <= 1:
@@ -61,19 +60,28 @@ if db_dates:
         for i in range(len(db_dates)-1):
             if (db_dates[i] - db_dates[i+1]).days == 1: current_streak += 1
             else: break
-
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
 
-# --- 3. MILESTONE ENGINE ---
+# --- 3. REWARD & SHOP DEFINITIONS ---
+shop_items = {
+    "Coffee Machine ☕": 150, 
+    "Studio Cat 🐈": 300, 
+    "Neon 'VIBE' Sign 🏮": 450, 
+    "Bass Subwoofer 🔊": 800, 
+    "Smoke Machine 💨": 1200,
+    "Golden Mic 🎤": 2500
+}
+
 achievements = [
-    {"id": "day1", "name": "First Day on the Block", "reward": "Underground UI 🧱", "target": 1, "current": len(db_dates), "unit": "session", "rc": 20},
+    {"id": "day1", "name": "First Day", "reward": "Underground UI 🧱", "target": 1, "current": len(db_dates), "unit": "session", "rc": 20},
     {"id": "week", "name": "Rising Star", "reward": "Blue Booth UI 🟦", "target": 7, "current": current_streak, "unit": "day streak", "rc": 250},
-    {"id": "month", "name": "Platinum Artist", "reward": "Gold Vault UI 🟨", "target": 30, "current": current_streak, "unit": "day streak", "rc": 1000},
+    {"id": "month", "name": "Platinum", "reward": "Gold Vault UI 🟨", "target": 30, "current": current_streak, "unit": "day streak", "rc": 1000},
 ]
 
+# Point Calculation
 user_points = (len(db_dates) * 10) + ((total_words // 10) * 5)
 user_points += sum([a['rc'] for a in achievements if a['id'] in claimed])
-user_points -= sum([150 for p in purchases]) # Simplified math for example
+user_points -= sum([shop_items.get(p, 0) for p in purchases])
 
 def rebuild_and_save(new_map, new_pur, new_cla, new_theme):
     content = f"ACTIVE_THEME: {new_theme}\n"
@@ -84,104 +92,118 @@ def rebuild_and_save(new_map, new_pur, new_cla, new_theme):
             content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 4. THEME & UI ENGINE ---
-st.set_page_config(page_title="Studio Dashboard", layout="wide")
+# --- 4. VISUAL ENGINE ---
+st.set_page_config(page_title="Leander Studio", layout="wide")
 
-# Theme Definitions
+# Theme CSS
 themes = {
     "Default Dark": "background: #0f0f0f;",
-    "Underground UI 🧱": "background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://www.transparenttextures.com/patterns/brick-wall.png'); background-color: #1a1a1a;",
+    "Underground UI 🧱": "background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('https://www.transparenttextures.com/patterns/brick-wall.png'); background-color: #1a1a1a;",
     "Blue Booth UI 🟦": "background: radial-gradient(circle, #001a33 0%, #0f0f0f 100%);",
     "Gold Vault UI 🟨": "background: radial-gradient(circle, #2b2100 0%, #0f0f0f 100%);"
 }
 
-# Apply selected theme
+# Gear Effects CSS
+neon_fx = "text-shadow: 0 0 10px #00d4ff, 0 0 20px #00d4ff;" if "Neon 'VIBE' Sign 🏮" in purchases else ""
+sub_fx = "animation: sub-thump 0.5s infinite alternate;" if "Bass Subwoofer 🔊" in purchases else ""
+smoke_fx = "animation: smoke-drift 12s infinite linear; opacity: 0.25;" if "Smoke Machine 💨" in purchases else "display:none;"
+
 st.markdown(f"""
 <style>
     .stApp {{ {themes.get(active_theme, themes["Default Dark"])} }}
+    @keyframes sub-thump {{ from {{ transform: scale(1); }} to {{ transform: scale(1.01); }} }}
+    @keyframes smoke-drift {{ from {{ transform: translateX(-100%); }} to {{ transform: translateX(100%); }} }}
     .stats-card {{
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.04);
         padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);
-        text-align: center;
+        text-align: center; {sub_fx}
     }}
+    .neon-title {{ {neon_fx} color: white; text-align: center; font-family: monospace; font-size: 32px; }}
+    .smoke-layer {{ position: fixed; top: 0; left: 0; width: 200%; height: 100%; pointer-events: none; z-index: 0; background: url('https://www.transparenttextures.com/patterns/asfalt-dark.png'); {smoke_fx} }}
 </style>
+<div class="smoke-layer"></div>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR THEME SELECTOR ---
+# --- 5. UI ---
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
-    
     st.divider()
-    st.subheader("🎨 Studio Appearance")
     
-    # Check which themes are unlocked
-    available_themes = ["Default Dark"]
-    for a in achievements:
-        if a['id'] in claimed:
-            available_themes.append(a['reward'])
-    
-    selected_theme = st.selectbox("Choose Theme", available_themes, index=available_themes.index(active_theme) if active_theme in available_themes else 0)
-    
-    if selected_theme != active_theme:
-        rebuild_and_save(entry_map, purchases, claimed, selected_theme)
+    # Theme Selector
+    available_themes = ["Default Dark"] + [a['reward'] for a in achievements if a['id'] in claimed]
+    sel_theme = st.selectbox("Switch Theme", available_themes, index=available_themes.index(active_theme) if active_theme in available_themes else 0)
+    if sel_theme != active_theme:
+        rebuild_and_save(entry_map, purchases, claimed, sel_theme)
         st.rerun()
-    
+
     st.divider()
-    st.write("📦 Installed Gear:")
-    for item in purchases: st.caption(f"✅ {item}")
+    st.write("📦 **Installed Gear**")
+    if not purchases: st.caption("No gear installed yet.")
+    for p in purchases: st.success(f"ONLINE: {p}")
+    st.divider()
+    st.link_button("🔙 Main App", "https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app")
 
-# --- 6. MAIN TABS ---
-st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO SYSTEMS</h1>", unsafe_allow_html=True)
+st.markdown('<p class="neon-title">LEANDER STUDIO SYSTEMS</p>', unsafe_allow_html=True)
 
+# Stats
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Words</h3><h2>{total_words}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak}</h2></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="stats-card"><h3>Points</h3><h2>{user_points}</h2></div>', unsafe_allow_html=True)
 
-tabs = st.tabs(["✍️ Recording", "📂 Vault", "🏆 Career"])
+# Tabs
+t1, t2, t3, t4 = st.tabs(["✍️ Record", "📂 Vault", "🏪 Shop", "🏆 Career"])
 
-with tabs[0]:
-    d_input = st.date_input("Session Date", value=be_now.date())
-    d_str = d_input.strftime('%d/%m/%Y')
-    new_bars = st.text_area("Drop bars here...", value=entry_map.get(d_str, ""), height=300)
-    if st.button("🚀 Record Session"):
-        entry_map[d_str] = new_bars
+with t1:
+    d_str = st.date_input("Date").strftime('%d/%m/%Y')
+    bars = st.text_area("Write...", value=entry_map.get(d_str, ""), height=300)
+    if st.button("🚀 Save Session"):
+        entry_map[d_str] = bars
         rebuild_and_save(entry_map, purchases, claimed, active_theme)
         st.rerun()
 
-with tabs[1]:
-    days_to_show = (be_now.date() - START_DATE).days
-    for i in range(days_to_show + 1):
-        target_dt = be_now.date() - timedelta(days=i)
-        day_str = target_dt.strftime('%d/%m/%Y')
-        with st.expander(f"{'✅' if day_str in entry_map else '⚪'} {day_str}"):
-            v_text = st.text_area("Edit Bars", value=entry_map.get(day_str, ""), key=f"edit_{day_str}")
-            if st.button("Update Vault", key=f"btn_{day_str}"):
-                entry_map[day_str] = v_text
+with t2:
+    num_days = (be_now.date() - START_DATE).days
+    for i in range(num_days + 1):
+        d = (be_now.date() - timedelta(days=i)).strftime('%d/%m/%Y')
+        with st.expander(f"{'✅' if d in entry_map else '⚪'} {d}"):
+            edt = st.text_area("Edit", value=entry_map.get(d, ""), key=f"v_{d}")
+            if st.button("Update", key=f"b_{d}"):
+                entry_map[d] = edt
                 rebuild_and_save(entry_map, purchases, claimed, active_theme)
                 st.rerun()
 
-with tabs[2]:
-    st.header("🏆 Career Quest Log")
+with t3:
+    st.header("Studio Shop")
+    sc1, sc2 = st.columns(2)
+    for i, (item, price) in enumerate(shop_items.items()):
+        with (sc1 if i % 2 == 0 else sc2):
+            if item in purchases: st.info(f"Owned: {item}")
+            elif st.button(f"Buy {item} ({price} RC)"):
+                if user_points >= price:
+                    purchases.append(item)
+                    rebuild_and_save(entry_map, purchases, claimed, active_theme)
+                    st.rerun()
+                else: st.error("Not enough RC!")
+
+with t4:
+    st.header("Career Quests")
     for a in achievements:
-        is_claimed = a['id'] in claimed
-        is_ready = a['current'] >= a['target']
-        progress = min(a['current'] / a['target'], 1.0)
-        
-        col_info, col_status = st.columns([3, 1])
-        with col_info:
-            st.subheader(f"{a['name']}")
-            st.write(f"🎁 **Reward:** {a['reward']}")
-            if not is_claimed:
-                st.progress(progress)
-                st.caption(f"Goal: {a['current']} / {a['target']} {a['unit']}")
-        with col_status:
-            if is_claimed: st.success("Unlocked")
-            elif is_ready:
-                if st.button("Claim Reward", key=a['id']):
+        prog = min(a['current'] / a['target'], 1.0)
+        col_i, col_s = st.columns([3, 1])
+        with col_i:
+            st.subheader(a['name'])
+            st.write(f"Reward: {a['reward']}")
+            if a['id'] not in claimed:
+                st.progress(prog)
+                st.caption(f"{a['current']} / {a['target']} {a['unit']}")
+        with col_s:
+            if a['id'] in claimed: st.success("Claimed")
+            elif prog >= 1.0:
+                if st.button("Claim", key=f"c_{a['id']}"):
                     claimed.append(a['id'])
                     rebuild_and_save(entry_map, purchases, claimed, active_theme)
                     st.rerun()
-            else: st.button("Locked", disabled=True, key=f"lock_{a['id']}")
+            else: st.button("Locked", disabled=True, key=f"l_{a['id']}")
         st.divider()

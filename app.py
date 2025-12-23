@@ -138,7 +138,11 @@ st.markdown(f"""
     div[data-baseweb="textarea"] textarea {{ {foam_style} }}
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
-    .vault-dot {{ height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 10px; }}
+    
+    /* Missed Day Styling */
+    .status-tag {{ padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }}
+    .status-missed {{ background: #ff4b4b; color: white; }}
+    .status-recorded {{ background: #2ecc71; color: white; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -198,18 +202,29 @@ with t_rec:
         entry_map[today_str] = lyrics; save_all(); st.rerun()
 
 with t_jou:
+    # Get all dates that have entries
     data_dates = [datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()]
     if today_date not in data_dates: data_dates.append(today_date)
+    
+    # Range from the very first entry to today
     curr_d, min_d = max(data_dates), min(data_dates)
     
     while curr_d >= min_d:
         d_s = curr_d.strftime('%d/%m/%Y')
-        content = entry_map.get(d_s, "")
-        dot_color = "#2ecc71" if content.strip() else "#444"
+        content = entry_map.get(d_s, "").strip()
         
-        with st.expander(f"● {d_s} {'(Today)' if d_s == today_str else ''}", expanded=(d_s == today_str)):
-            st.markdown(f"<style>div[id*='expandable'] p {{ color: {dot_color}; }}</style>", unsafe_allow_html=True)
-            new_txt = st.text_area(f"Edit {d_s}", value=content, height=150, key=f"j_{d_s}")
+        # Check if day was missed
+        is_empty = not content
+        dot_char = "⚪" if is_empty else "🟢"
+        status_label = '<span class="status-tag status-missed">MISSED</span>' if is_empty else '<span class="status-tag status-recorded">RECORDED</span>'
+        
+        # Special styling for today
+        display_name = f"{dot_char} {d_s}"
+        if d_s == today_str: display_name += " (Today)"
+        
+        with st.expander(display_name, expanded=(d_s == today_str)):
+            st.markdown(f"Status: {status_label}", unsafe_allow_html=True)
+            new_txt = st.text_area(f"Lyrics for {d_s}", value=content, height=150, key=f"j_{d_s}")
             if st.button(f"Update {d_s}", key=f"b_{d_s}"):
                 entry_map[d_s] = new_txt; save_all(); st.rerun()
         curr_d -= timedelta(days=1)

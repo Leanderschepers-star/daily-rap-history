@@ -37,7 +37,7 @@ def update_github_file(content, msg="Update"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA PARSING & ECONOMY ---
+# --- 3. DATA PARSING & ADVANCED ECONOMY ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
@@ -49,6 +49,7 @@ claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
 unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
 
+# STREAK CALC
 current_streak = 0
 if unique_dates:
     if (today_date - unique_dates[0]).days <= 1:
@@ -57,6 +58,20 @@ if unique_dates:
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
 
+# WORD COUNT
+total_words = 0
+for entry in entries_raw:
+    lyric_part = entry.split("LYRICS:")[-1]
+    total_words += len(lyric_part.split())
+
+# LEVELS
+if total_words < 200: studio_level, level_name = 1, "Bedroom Producer"
+elif total_words < 500: studio_level, level_name = 2, "Underground Artist"
+elif total_words < 1000: studio_level, level_name = 3, "Studio Sessionist"
+elif total_words < 2500: studio_level, level_name = 4, "Professional Rapper"
+else: studio_level, level_name = 5, "Chart Topper"
+
+# REWARDS DEFINITIONS
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
 achievements = [
     {"id": "first", "name": "Rookie of the Year", "how": "Submit 1st entry.", "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"},
@@ -64,21 +79,15 @@ achievements = [
     {"id": "month", "name": "Legendary Status", "how": "30-day streak.", "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"}
 ]
 
-total_words = 0
-for entry in entries_raw:
-    lyric_part = entry.split("LYRICS:")[-1]
-    total_words += len(lyric_part.split())
-
-if total_words < 200: studio_level, level_name = 1, "Bedroom Producer"
-elif total_words < 500: studio_level, level_name = 2, "Underground Artist"
-elif total_words < 1000: studio_level, level_name = 3, "Studio Sessionist"
-elif total_words < 2500: studio_level, level_name = 4, "Professional Rapper"
-else: studio_level, level_name = 5, "Chart Topper"
-
-user_points = (len(unique_dates) * 10) + ((total_words // 10) * 5) + sum([a['rc'] for a in achievements if a['id'] in claimed]) - sum([shop_items.get(p, 0) for p in purchases])
+# WALLET MATH
+session_rewards = len(unique_dates) * 10
+word_rewards = (total_words // 10) * 5
+bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
+spent_points = sum([shop_items.get(p, 0) for p in purchases])
+user_points = session_rewards + word_rewards + bonus_points - spent_points
 inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
 
-# --- 4. UI SETUP & ANIMATION CSS ---
+# --- 4. UI SETUP & ANIMATIONS ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
 
 st.markdown("""
@@ -90,29 +99,44 @@ st.markdown("""
     
     .float { animation: floating 3s ease-in-out infinite; text-align: center; }
     .pulse { animation: pulse 1s ease-in-out infinite; text-align: center; }
-    .neon { color: #ff00de; font-weight: bold; animation: neon 1.5s ease-in-out infinite alternate; text-align: center; font-size: 20px; }
+    .neon-text { color: #ff00de; font-weight: bold; animation: neon 1.5s ease-in-out infinite alternate; text-align: center; font-size: 22px; margin-top: 10px; }
     .disc { animation: rotate 4s linear infinite; border-radius: 50%; }
+    
+    .mannequin-box {
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid #444;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        min-height: 200px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.title("🕹️ Studio Control")
+    profile_emoji = "👤"
+    if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
+    if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
+
+    st.title(f"{profile_emoji} Studio Control")
     st.markdown(f"### 💰 Wallet: **{user_points} RC**")
     st.markdown(f"### 🔥 Streak: **{current_streak} Days**")
     st.divider()
     st.write(f"📈 **Level {studio_level}: {level_name}**")
     st.progress(min(total_words / 2500, 1.0))
+    st.caption(f"Progress: {total_words} / 2500 words")
     
     st.divider()
     st.subheader("📦 Display Manager")
     show_items = {item: st.checkbox(f"Show {item}", value=True, key=f"inv_{item}") for item in inventory}
     st.divider()
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
+    if st.button("🔄 Refresh Studio", use_container_width=True): st.rerun()
 
 # --- 5. VISUAL STUDIO SCREEN ---
 st.title("🎤 My Recording Studio")
 
-# Grid for items
+# Physical Decor Layout
 v1, v2, v3, v4, v5 = st.columns(5)
 
 with v1: # COFFEE MACHINE
@@ -125,20 +149,34 @@ with v2: # STUDIO CAT
         st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKMGpxx323X3NqE/giphy.gif" width="80"></div>', unsafe_allow_html=True)
         st.caption("Studio Manager")
 
-with v3: # NEON SIGN
+with v3: # THE MANNEQUIN (AVATAR)
+    cap = "🧢" if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢") else ""
+    chain = "⛓️" if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️") else ""
+    
+    st.markdown(f"""
+    <div class="mannequin-box">
+        <div class="float" style="font-size: 30px; height: 30px;">{cap}</div>
+        <div style="font-size: 60px;">👤</div>
+        <div class="pulse" style="font-size: 30px; height: 30px; margin-top: -20px;">{chain}</div>
+        <p style="margin-top:10px; color:gray; font-size:12px;">Artist Avatar</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
-        st.markdown('<br><div class="neon">🔴 ON AIR</div>', unsafe_allow_html=True)
+        st.markdown('<div class="neon-text">🔴 ON AIR</div>', unsafe_allow_html=True)
 
 with v4: # SUBWOOFER
     if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
-        st.markdown('<div class="pulse"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKXpT097m0R9F2E/giphy.gif" width="80"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="pulse"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKXpT097m0R9F2E/giphy.gif" width="80"></div>', unsafe_allow_html=True)
         st.caption("Feel the Bass")
 
-with v5: # GOLDEN MIC or PLAQUE
+with v5: # GOLDEN MIC / PLAQUE
     if "Golden Mic 🎤" in inventory and show_items.get("Golden Mic 🎤"):
         st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l41lTfO3vDskGf7UY/giphy.gif" width="70"></div>', unsafe_allow_html=True)
+        st.caption("Pro Mic")
     elif "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
         st.markdown('<div class="float"><img class="disc" src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKDkDbIDJieU2Zy/giphy.gif" width="60"></div>', unsafe_allow_html=True)
+        st.caption("Hit Record")
 
 st.divider()
 
@@ -160,19 +198,28 @@ with t2:
             with st.expander(f"📅 {d}"): st.text(entry_map[d])
 
 with t3:
+    st.header("Studio Upgrades")
     cols = st.columns(3)
     for i, (item, price) in enumerate(shop_items.items()):
         with cols[i % 3]:
-            if item in purchases: st.write(f"✅ {item}")
+            if item in purchases: st.success(f"OWNED: {item}")
             elif st.button(f"Buy {item} ({price} RC)"):
-                if user_points >= price: update_github_file(f"PURCHASE: {item}\n" + full_text); st.rerun()
+                if user_points >= price:
+                    update_github_file(f"PURCHASE: {item}\n" + full_text)
+                    st.rerun()
+                else: st.error("Need more RC!")
 
 with t4:
+    st.header("Career Milestones")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
-        with c1: st.write(f"**{a['name']}**"); st.caption(a['how'])
+        with c1:
+            st.write(f"**{a['name']}**")
+            st.caption(f"{a['how']} | Reward: {a['reward_text']}")
         with c2:
             if a['id'] in claimed: st.success("Claimed")
             elif a['req']:
-                if st.button("Claim", key=a['id']): update_github_file(f"CLAIMED: {a['id']}\n" + full_text); st.rerun()
-            else: st.write("🔒")
+                if st.button("Claim", key=a['id']):
+                    update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
+                    st.rerun()
+            else: st.write("🔒 Locked")

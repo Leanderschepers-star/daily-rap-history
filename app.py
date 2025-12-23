@@ -72,18 +72,23 @@ if valid_dates:
             else: break
 
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
-shop_prices = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
+shop_items = {
+    "Coffee Machine ☕": 150, 
+    "Studio Cat 🐈": 300, 
+    "Neon Sign 🏮": 400, 
+    "Subwoofer 🔊": 800, 
+    "Golden Mic 🎤": 1000
+}
 
 achievements = [
-    {"id": "first", "name": "Rookie of the Year", "desc": "Drop 1st bars", "req": len(valid_dates) >= 1, "rc": 50, "item": "Rookie Cap 🧢"},
-    {"id": "week", "name": "Weekly Grind", "desc": "7-day streak", "req": current_streak >= 7, "rc": 250, "item": "Silver Chain ⛓️"},
-    {"id": "month", "name": "Legendary Status", "desc": "30-day streak", "req": current_streak >= 30, "rc": 500, "item": "Platinum Plaque 💿"}
+    {"id": "first", "name": "Rookie", "desc": "1st Session", "req": len(valid_dates) >= 1, "rc": 50},
+    {"id": "week", "name": "Weekly Grind", "desc": "7-day streak", "req": current_streak >= 7, "rc": 250},
+    {"id": "month", "name": "Legendary", "desc": "30-day streak", "req": current_streak >= 30, "rc": 500}
 ]
 
 user_points = (len(valid_dates) * 10) + ((total_words // 10) * 5)
 user_points += sum([a['rc'] for a in achievements if a['id'] in claimed])
-user_points -= sum([shop_prices.get(p, 0) for p in purchases])
-inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed]
+user_points -= sum([shop_items.get(p, 0) for p in purchases])
 
 def rebuild_and_save(new_map, new_pur, new_cla):
     content = ""
@@ -93,128 +98,83 @@ def rebuild_and_save(new_map, new_pur, new_cla):
         content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 6. UI SETUP & SIDEBAR ---
-st.set_page_config(page_title="Studio Journal", layout="wide")
+# --- 6. DYNAMIC CSS (STREAK BASED) ---
+streak_color = "#1E1E1E" # Default Dark
+if current_streak >= 30: streak_color = "linear-gradient(135deg, #1e1e1e 0%, #4a3b00 100%)" # Gold glow
+elif current_streak >= 7: streak_color = "linear-gradient(135deg, #1e1e1e 0%, #001a33 100%)" # Blue glow
 
+st.set_page_config(page_title="Studio Journal", layout="wide")
+st.markdown(f"""
+<style>
+    .stApp {{ background: {streak_color}; }}
+    .stats-card {{
+        background: rgba(255, 255, 255, 0.05);
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        margin-bottom: 20px;
+    }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 7. UI ---
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"{current_streak} Days")
-    if st.button("📢 Test Phone Notif"):
-        send_notif("Mic Check!", "Connection to studio is live.")
     st.divider()
-    # Fixed: show_items is defined here so the Avatar section can access it below
-    show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
+    st.write("📦 **Studio Inventory**")
+    for item in purchases:
+        st.caption(f"✅ {item}")
+    st.divider()
+    if st.button("📢 Test Phone Notif"):
+        send_notif("Mic Check!", "Studio connection live.")
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
-# CSS: Character Styling & Synced Animation
-st.markdown("""
-<style>
-    @keyframes sync-float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-12px); }
-        100% { transform: translateY(0px); }
-    }
-    .character-box {
-        animation: sync-float 3s ease-in-out infinite;
-        position: relative;
-        height: 400px;
-        width: 100%;
-        background: rgba(255,255,255,0.03);
-        border-radius: 20px;
-        border: 1px solid #333;
-        display: flex;
-        justify-content: center;
-        overflow: hidden;
-    }
-    .body-layer { position: absolute; line-height: 1; display: flex; justify-content: center; width: 100%; }
-    
-    /* Vertical Positioning */
-    .hat   { font-size: 50px; z-index: 10; top: 32px; }
-    .face  { font-size: 60px; z-index: 5;  top: 65px; filter: grayscale(100%) brightness(1.6); }
-    .chain { font-size: 38px; z-index: 6;  top: 105px; }
-    .shirt { font-size: 85px; z-index: 4;  top: 115px; filter: grayscale(100%) brightness(1.2); }
-    .pants { font-size: 75px; z-index: 2;  top: 190px; filter: grayscale(100%) brightness(1.1); }
-    
-    /* Limbs */
-    .arms  { 
-        font-size: 45px; z-index: 3; top: 140px; 
-        filter: grayscale(100%) brightness(1.4); 
-        letter-spacing: 95px; padding-left: 95px;
-    }
-    .feet  { 
-        font-size: 30px; z-index: 1; top: 260px; 
-        filter: grayscale(100%) brightness(1.4); 
-        letter-spacing: 35px; padding-left: 35px;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Top Dashboard
+c1, c2, c3 = st.columns(3)
+with c1: st.markdown(f'<div class="stats-card"><h3>📝 Words</h3><h2>{total_words}</h2></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stats-card"><h3>🔥 Streak</h3><h2>{current_streak}</h2></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="stats-card"><h3>💰 Rap Coins</h3><h2>{user_points}</h2></div>', unsafe_allow_html=True)
 
-# --- 7. AVATAR VISUAL ---
-v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1])
-with v3:
-    cap_display = "🧢" if show_items.get("Rookie Cap 🧢") else ""
-    chain_display = "⛓️" if show_items.get("Silver Chain ⛓️") else ""
-    
-    st.markdown(f"""
-    <div class="character-box">
-        <div class="body-layer hat">{cap_display}</div>
-        <div class="body-layer face">👦</div>
-        <div class="body-layer chain">{chain_display}</div>
-        <div class="body-layer arms">🖐️🖐️</div>
-        <div class="body-layer shirt">👕</div>
-        <div class="body-layer pants">👖</div>
-        <div class="body-layer feet">👟👟</div>
-        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Studio Artist</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- 8. TABS ---
 t1, t2, t3, t4 = st.tabs(["✍️ New Session", "📂 The Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
-    target_date = st.date_input("Session Date", value=be_now.date(), min_value=START_DATE)
+    target_date = st.date_input("Session Date", value=be_now.date())
     d_str = target_date.strftime('%d/%m/%Y')
-    if d_str in entry_map:
-        st.info("Date already exists. Use Vault to edit.")
-    else:
-        new_lyr = st.text_area("Write lyrics...", height=250)
-        if st.button("🚀 Record Session"):
-            entry_map[d_str] = new_lyr
-            rebuild_and_save(entry_map, purchases, claimed)
-            send_notif("Session Recorded!", f"New bars saved for {d_str}")
-            st.rerun()
+    new_lyr = st.text_area("Write lyrics...", height=300)
+    if st.button("🚀 Record Session"):
+        entry_map[d_str] = new_lyr
+        rebuild_and_save(entry_map, purchases, claimed)
+        send_notif("Bars Saved!", f"Session recorded for {d_str}")
+        st.rerun()
 
 with t2:
     st.header("The Vault")
-    delta = (be_now.date() - START_DATE).days
-    for i in range(delta + 1):
-        day = (be_now.date() - timedelta(days=i)).strftime('%d/%m/%Y')
-        with st.expander(f"{'✅' if day in entry_map else '⚪'} {day}"):
-            if day in entry_map:
-                edt = st.text_area("Edit", value=entry_map[day], height=200, key=f"v_{day}")
-                if st.button("💾 Save", key=f"b_{day}"):
-                    entry_map[day] = edt
-                    rebuild_and_save(entry_map, purchases, claimed)
-                    send_notif("Lyrics Updated", f"Vault entry for {day} was modified.")
-                    st.rerun()
-            else: st.write("No session found.")
+    for day in sorted(entry_map.keys(), reverse=True):
+        with st.expander(f"📅 {day}"):
+            edt = st.text_area("Edit", value=entry_map[day], height=200, key=f"v_{day}")
+            if st.button("💾 Save Changes", key=f"b_{day}"):
+                entry_map[day] = edt
+                rebuild_and_save(entry_map, purchases, claimed)
+                st.rerun()
 
 with t3:
-    st.header("Shop")
+    st.header("Studio Shop")
     cols = st.columns(2)
-    for i, (item, price) in enumerate(shop_prices.items()):
+    for i, (item, price) in enumerate(shop_items.items()):
         with cols[i%2]:
-            if item in purchases: st.success(f"OWNED: {item}")
+            if item in purchases: st.success(f"Installed: {item}")
             elif st.button(f"Buy {item} ({price}RC)"):
                 if user_points >= price:
                     purchases.append(item)
                     rebuild_and_save(entry_map, purchases, claimed)
-                    send_notif("Shop Purchase!", f"You just bought {item}")
+                    send_notif("New Equipment!", f"Purchased {item}")
                     st.rerun()
 
 with t4:
-    st.header("🏆 Career Achievements")
+    st.header("🏆 Career achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:
@@ -226,6 +186,5 @@ with t4:
                 if st.button("Claim", key=f"c_{a['id']}"):
                     claimed.append(a['id'])
                     rebuild_and_save(entry_map, purchases, claimed)
-                    send_notif("Achievement!", f"Claimed: {a['name']}")
                     st.rerun()
             else: st.write("🔒 Locked")

@@ -96,35 +96,33 @@ def rebuild_and_save(new_map, new_pur, new_cla):
 # --- 6. UI ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
 
-# CSS: Added 'sync-float' so the hat and body move as one unit
+# CSS: Updated for Full-Body Character Layering
 st.markdown("""
 <style>
     @keyframes sync-float {
         0% { transform: translateY(0px); }
-        50% { transform: translateY(-8px); }
+        50% { transform: translateY(-12px); }
         100% { transform: translateY(0px); }
     }
-    .character-container {
+    .character-box {
         animation: sync-float 3s ease-in-out infinite;
         position: relative;
-        text-align: center;
-        background: rgba(255,255,255,0.05);
+        height: 320px;
+        width: 100%;
+        background: rgba(255,255,255,0.03);
         border-radius: 20px;
-        padding: 30px;
         border: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow: hidden;
     }
-    .mannequin {
-        font-size: 90px;
-        filter: grayscale(100%) brightness(1.5); /* Makes the blue emoji look light grey/white */
-    }
-    .hat-overlay {
-        position: absolute;
-        top: 15px;
-        left: 0;
-        right: 0;
-        font-size: 45px;
-        z-index: 2;
-    }
+    .body-layer { position: absolute; line-height: 1; }
+    .face { font-size: 65px; z-index: 2; top: 65px; filter: grayscale(100%) brightness(1.6); }
+    .hat  { font-size: 48px; z-index: 5; top: 18px; }
+    .shirt { font-size: 85px; z-index: 1; top: 110px; filter: grayscale(100%) brightness(1.2); }
+    .pants { font-size: 75px; z-index: 0; top: 185px; filter: grayscale(100%) brightness(1.1); }
+    .chain { font-size: 38px; z-index: 3; top: 105px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -139,14 +137,19 @@ with st.sidebar:
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
 # MANNEQUIN SECTION
-v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1]) # Middle column is wider
+v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1])
 with v3:
-    cap_emoji = "🧢" if show_items.get("Rookie Cap 🧢") else ""
+    cap_display = "🧢" if show_items.get("Rookie Cap 🧢") else ""
+    chain_display = "⛓️" if show_items.get("Silver Chain ⛓️") else ""
+    
     st.markdown(f"""
-    <div class="character-container">
-        <div class="hat-overlay">{cap_emoji}</div>
-        <div class="mannequin">👤</div>
-        <p style="margin-top:10px; color:gray; font-size:12px;">Artist Profile</p>
+    <div class="character-box">
+        <div class="body-layer hat">{cap_display}</div>
+        <div class="body-layer face">👦</div>
+        <div class="body-layer chain">{chain_display}</div>
+        <div class="body-layer shirt">👕</div>
+        <div class="body-layer pants">👖</div>
+        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Artist Profile</p>
     </div>
     """, unsafe_allow_html=True)
 

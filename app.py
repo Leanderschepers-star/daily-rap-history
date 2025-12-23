@@ -41,13 +41,11 @@ def update_github_file(content, msg="Update"):
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
-# A. Basic Parsing
 all_blocks = [b.strip() for b in re.split(r'-{3,}', full_text) if b.strip()]
 entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
-# B. Date Mapping & Streak Calculation
 entry_map = {}
 for e in entries_raw:
     m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
@@ -66,7 +64,6 @@ if unique_dates:
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
 
-# C. Definitions (Crucial to define BEFORE math)
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
 achievements = [
     {"id": "first", "name": "Rookie of the Year", "how": "Submit 1st entry.", "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"},
@@ -74,20 +71,17 @@ achievements = [
     {"id": "month", "name": "Legendary Status", "how": "30-day streak.", "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"}
 ]
 
-# D. Word Count Calculation
 total_words = 0
 for entry in entries_raw:
     lyric_content = entry.split("LYRICS:")[-1]
     total_words += len(lyric_content.split())
 
-# E. Studio Level Logic
 if total_words < 200: studio_level, level_name = 1, "Bedroom Producer"
 elif total_words < 500: studio_level, level_name = 2, "Underground Artist"
 elif total_words < 1000: studio_level, level_name = 3, "Studio Sessionist"
 elif total_words < 2500: studio_level, level_name = 4, "Professional Rapper"
 else: studio_level, level_name = 5, "Chart Topper"
 
-# F. Final Rewards Math
 session_rewards = len(unique_dates) * 10
 word_rewards = (total_words // 10) * 5
 bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
@@ -96,51 +90,46 @@ spent_points = sum([shop_items.get(p, 0) for p in purchases])
 user_points = session_rewards + word_rewards + bonus_points - spent_points
 inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
 
-# --- 4. UI ---
+# --- 4. UI SETUP ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
 
 with st.sidebar:
-    # Artist Profile Emoji logic
     profile_emoji = "👤"
     if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
     if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
 
     st.title(f"{profile_emoji} Studio Control")
-    
-    # Primary Stats
     col1, col2 = st.columns(2)
     col1.metric("Wallet", f"{user_points} RC")
     col2.metric("Streak", f"🔥 {current_streak} Days")
     
     st.divider()
-    
-    # Studio Progress
     st.write(f"📈 **Studio Level: {studio_level}**")
     st.progress(min(total_words / 2500, 1.0))
     st.caption(f"Role: {level_name} ({total_words}/2500 words)")
     
     st.divider()
-    
-    # Display Manager (Inventory)
     st.subheader("📦 Display Manager")
-    st.caption("Toggle items to decorate your studio:")
     show_items = {}
     if not inventory:
         st.write("No items yet. Visit the Shop!")
     else:
         for item in inventory:
-            show_items[item] = st.checkbox(f"Show {item}", value=True)
+            show_items[item] = st.checkbox(f"Show {item}", value=True, key=f"sidebar_{item}")
     
     st.divider()
-    
-    # Navigation
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
     if st.button("🔄 Refresh Studio", use_container_width=True):
         st.rerun()
-# --- 5. STUDIO SCREEN ---
-st.title("🎤 My Studio")
 
-# Physical Decor
+# --- 5. MAIN STUDIO SCREEN ---
+# Wearable emojis in header
+wearables = ""
+if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢"): wearables += " 🧢"
+if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️"): wearables += " ⛓️"
+st.title(f"🎤 My Studio{wearables}")
+
+# Physical Decor Layout
 studio_cols = st.columns(5)
 if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
     studio_cols[0].info("☕ **Brewing...**")
@@ -151,73 +140,11 @@ if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
 if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
     studio_cols[3].success("🔊 **Booming**")
 if "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
-    studio_cols[4].help("💿 **Classic**")
-
-st.divider()
-
-# --- TABS ---
-t1, t2, t3, t4 = st.tabs(["✍️ Write", "📂 Vault", "🏪 Shop", "🏆 Career"])
-
-with t1:
-    if today_str in entry_map: 
-        st.success("Session recorded for today!")
-    else:
-        lyrics = st.text_area("Drop fire bars:", height=300)
-        if st.button("🚀 Record Session"):
-            update_github_file(f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text)
-            st.rerun()
-
-# (Tabs 2, 3, 4 logic follows the same structure as before)
-# ... [Rest of your Tab UI code]
-
-# --- 4. UI ---
-st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
-
-# SIDEBAR: DASHBOARD + DISPLAY MANAGER
-with st.sidebar:
-    st.title("🕹️ Studio Control")
-    st.metric("Wallet", f"{user_points} RC")
-    st.metric("Streak", f"🔥 {current_streak} Days")
-    st.divider()
-    
-    st.subheader("📦 Display Manager")
-    st.caption("Check items to show them in your studio")
-    
-    # Create a dictionary to track what the user wants to show
-    show_items = {}
-    for item in inventory:
-        show_items[item] = st.checkbox(f"Display {item}", value=True)
-    
-    st.divider()
-    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
-
-# --- 5. THE ACTUAL WEBSITE SCREEN (THE STUDIO) ---
-# This section renders items directly on the page based on Display Manager
-st.title("🎤 My Recording Studio")
-
-# Physical Studio Layout (Items appear here)
-studio_cols = st.columns(5)
-
-if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
-    studio_cols[0].info("☕ **Coffee is Brewing**")
-if "Studio Cat 🐈" in inventory and show_items.get("Studio Cat 🐈"):
-    studio_cols[1].warning("🐈 **Cat is Napping**")
-if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
-    studio_cols[2].error("🏮 **ON AIR**")
-if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
-    studio_cols[3].success("🔊 **Bass Booming**")
-if "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
     studio_cols[4].help("💿 **Top 100 Hit**")
 
-# Wearables (Emojis added to your header)
-wearables = ""
-if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢"): wearables += " 🧢"
-if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️"): wearables += " ⛓️"
-st.subheader(f"Current Artist Style: {wearables if wearables else 'Basic 👤'}")
-
 st.divider()
 
-# --- TABS ---
+# --- 6. TABS ---
 t1, t2, t3, t4 = st.tabs(["✍️ Write Bars", "📂 Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
@@ -250,9 +177,11 @@ with t3:
                 if user_points >= price:
                     update_github_file(f"PURCHASE: {item}\n" + full_text)
                     st.rerun()
+                else:
+                    st.error("Not enough RC!")
 
 with t4:
-    st.header("Achievements")
+    st.header("Career Achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:

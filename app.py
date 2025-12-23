@@ -139,7 +139,6 @@ st.markdown(f"""
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
-    /* Missed Day Styling */
     .status-tag {{ padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }}
     .status-missed {{ background: #ff4b4b; color: white; }}
     .status-recorded {{ background: #2ecc71; color: white; }}
@@ -180,14 +179,30 @@ with st.sidebar:
     if sorted(new_gear_list) != sorted(enabled_gear):
         save_all(gear_to_save=new_gear_list); st.rerun()
 
+    # --- CHEST TESTER ---
+    st.divider()
+    if st.button("🎁 TEST CHEST ANIMATION", use_container_width=True):
+        st.session_state["test_trigger"] = True
+        st.rerun()
+
 # --- 6. MAIN UI ---
 st.markdown("<h1 style='text-align:center;'>STUDIO CONSOLE</h1>", unsafe_allow_html=True)
 
+# Chest Logic (Real and Test)
 if st.session_state["test_trigger"] or (len(claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x)):
-    if st.button("🎁 OPEN SESSION CHEST", type="primary", use_container_width=True):
+    title = "🎁 TEST SESSION CHEST (No Reward)" if st.session_state["test_trigger"] else "🎁 OPEN SESSION CHEST"
+    if st.button(title, type="primary", use_container_width=True):
         st.snow()
-        if not st.session_state["test_trigger"]: tasks_done.append(f"{today_str}_COMPLETION_RC250"); save_all()
-        st.session_state["test_trigger"] = False; time.sleep(1); st.rerun()
+        if not st.session_state["test_trigger"]:
+            tasks_done.append(f"{today_str}_COMPLETION_RC250")
+            save_all()
+            st.success("Session Complete! +250 RC")
+        else:
+            st.toast("Animation Test Complete!")
+        
+        st.session_state["test_trigger"] = False
+        time.sleep(2)
+        st.rerun()
 
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
@@ -202,23 +217,17 @@ with t_rec:
         entry_map[today_str] = lyrics; save_all(); st.rerun()
 
 with t_jou:
-    # Get all dates that have entries
     data_dates = [datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()]
     if today_date not in data_dates: data_dates.append(today_date)
-    
-    # Range from the very first entry to today
     curr_d, min_d = max(data_dates), min(data_dates)
     
     while curr_d >= min_d:
         d_s = curr_d.strftime('%d/%m/%Y')
         content = entry_map.get(d_s, "").strip()
-        
-        # Check if day was missed
         is_empty = not content
         dot_char = "⚪" if is_empty else "🟢"
         status_label = '<span class="status-tag status-missed">MISSED</span>' if is_empty else '<span class="status-tag status-recorded">RECORDED</span>'
         
-        # Special styling for today
         display_name = f"{dot_char} {d_s}"
         if d_s == today_str: display_name += " (Today)"
         

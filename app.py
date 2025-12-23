@@ -134,20 +134,22 @@ with v2: # STUDIO CAT
         st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKMGpxx323X3NqE/giphy.gif" width="80"></div>', unsafe_allow_html=True)
         st.caption("Studio Manager")
 
-with v3: # THE MANNEQUIN (AVATAR) - FIXED POSITIONING
-    cap_icon = "🧢" if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢") else ""
-    chain_icon = "⛓️" if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️") else ""
+with v3: # THE MANNEQUIN (AVATAR)
+    # Check if they should be displayed
+    cap_val = "🧢" if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢") else ""
+    chain_val = "⛓️" if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️") else ""
     
+    # This single markdown block creates the entire layered avatar
     st.markdown(f"""
-    <div class="mannequin-box">
+    <div style="background: rgba(255, 255, 255, 0.05); border: 2px solid #444; border-radius: 15px; padding: 10px; text-align: center; min-height: 220px; position: relative;">
         <div style="font-size: 90px; position: relative; z-index: 1; padding-top: 20px;">👤</div>
         
-        <div class="float" style="position: absolute; top: 15px; left: 50%; transform: translateX(-50%); font-size: 40px; z-index: 2;">
-            {cap_icon}
+        <div class="float" style="position: absolute; top: 15px; left: 0; right: 0; font-size: 40px; z-index: 2;">
+            {cap_val}
         </div>
         
-        <div class="pulse" style="position: absolute; top: 90px; left: 50%; transform: translateX(-50%); font-size: 40px; z-index: 2;">
-            {chain_icon}
+        <div class="pulse" style="position: absolute; top: 90px; left: 0; right: 0; font-size: 40px; z-index: 2;">
+            {chain_val}
         </div>
         
         <p style="margin-top:20px; color:gray; font-size:12px;">Artist Avatar</p>
@@ -169,7 +171,6 @@ with v5: # GOLDEN MIC / PLAQUE
     elif "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
         st.markdown('<div class="float"><img class="disc" src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKDkDbIDJieU2Zy/giphy.gif" width="60"></div>', unsafe_allow_html=True)
         st.caption("Hit Record")
-
 st.divider()
 
 # --- 6. TABS ---

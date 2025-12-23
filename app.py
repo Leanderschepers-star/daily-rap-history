@@ -96,7 +96,7 @@ def rebuild_and_save(new_map, new_pur, new_cla):
 # --- 6. UI ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
 
-# CSS: Updated for Full-Body Character Layering
+# --- UPDATE THE CSS SECTION ---
 st.markdown("""
 <style>
     @keyframes sync-float {
@@ -107,36 +107,30 @@ st.markdown("""
     .character-box {
         animation: sync-float 3s ease-in-out infinite;
         position: relative;
-        height: 320px;
+        height: 380px; /* Taller for limbs */
         width: 100%;
         background: rgba(255,255,255,0.03);
         border-radius: 20px;
         border: 1px solid #333;
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        overflow: hidden;
+        justify-content: center;
     }
-    .body-layer { position: absolute; line-height: 1; }
-    .face { font-size: 65px; z-index: 2; top: 65px; filter: grayscale(100%) brightness(1.6); }
-    .hat  { font-size: 48px; z-index: 5; top: 18px; }
-    .shirt { font-size: 85px; z-index: 1; top: 110px; filter: grayscale(100%) brightness(1.2); }
-    .pants { font-size: 75px; z-index: 0; top: 185px; filter: grayscale(100%) brightness(1.1); }
-    .chain { font-size: 38px; z-index: 3; top: 105px; }
+    .body-layer { position: absolute; line-height: 1; display: flex; justify-content: center; width: 100%; }
+    
+    /* Vertical Positioning */
+    .hat   { font-size: 48px; z-index: 10; top: 38px; }
+    .face  { font-size: 60px; z-index: 5;  top: 75px; filter: grayscale(100%) brightness(1.6); }
+    .chain { font-size: 38px; z-index: 6;  top: 115px; }
+    .shirt { font-size: 85px; z-index: 4;  top: 125px; filter: grayscale(100%) brightness(1.2); }
+    .pants { font-size: 75px; z-index: 2;  top: 200px; filter: grayscale(100%) brightness(1.1); }
+    
+    /* Arms and Legs */
+    .arms  { font-size: 90px; z-index: 3;  top: 120px; filter: grayscale(100%) brightness(1.4); letter-spacing: 50px; padding-left: 50px;}
+    .legs  { font-size: 40px; z-index: 1;  top: 265px; filter: grayscale(100%) brightness(1.4); letter-spacing: 20px; padding-left: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
-with st.sidebar:
-    st.title("🕹️ Studio Control")
-    st.metric("Wallet", f"{user_points} RC")
-    st.metric("Streak", f"{current_streak} Days")
-    if st.button("📢 Test Phone Notif"):
-        send_notif("Mic Check!", "Connection to studio is live.")
-    st.divider()
-    show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
-    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
-
-# MANNEQUIN SECTION
+# --- UPDATE THE MANNEQUIN SECTION (v3) ---
 v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1])
 with v3:
     cap_display = "🧢" if show_items.get("Rookie Cap 🧢") else ""
@@ -147,9 +141,11 @@ with v3:
         <div class="body-layer hat">{cap_display}</div>
         <div class="body-layer face">👦</div>
         <div class="body-layer chain">{chain_display}</div>
+        <div class="body-layer arms">💪💪</div>
         <div class="body-layer shirt">👕</div>
         <div class="body-layer pants">👖</div>
-        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Artist Profile</p>
+        <div class="body-layer legs">🦶🦶</div>
+        <p style="position:absolute; bottom:10px; color:gray; font-size:11px;">Studio Avatar</p>
     </div>
     """, unsafe_allow_html=True)
 

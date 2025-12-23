@@ -11,7 +11,7 @@ except:
 
 REPO_NAME = "leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
-MAIN_APP_URL = "https://daily-rap-app.streamlit.app" 
+MAIN_APP_URL = "https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app" 
 
 # TIME (STRICT BELGIUM)
 be_tz = pytz.timezone('Europe/Brussels')

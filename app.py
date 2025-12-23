@@ -9,11 +9,12 @@ except:
     st.error("Secrets not found. Please set GITHUB_TOKEN in your Streamlit settings.")
     st.stop()
 
-POSSIBLE_REPOS = ["leanderschepers-star/daily-rap-app", "leanderschepers-star/Daily-Rap-App"]
-POSSIBLE_FILES = ["streamlit_app.py", "app.py"]
+# URLs
+MAIN_APP_URL = "https://daily-rap-app.streamlit.app" # Change this to your actual Main App URL
 REPO_NAME = "leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
 
+# TIME
 belgium_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.now(belgium_tz)
 day_of_year = be_now.timetuple().tm_yday
@@ -29,24 +30,6 @@ def get_github_file(repo, path):
         return None, f"{r.status_code}"
     except: return None, "Conn Error"
 
-def get_synced_data():
-    for repo in POSSIBLE_REPOS:
-        for filename in POSSIBLE_FILES:
-            file_json, status = get_github_file(repo, filename)
-            if file_json:
-                content = base64.b64decode(file_json['content']).decode('utf-8')
-                w_match = re.search(r"words\s*=\s*(\[.*?\])", content, re.DOTALL)
-                s_match = re.search(r"sentences\s*=\s*(\[.*?\])", content, re.DOTALL)
-                m_match = re.search(r"motivation\s*=\s*(\[.*?\])", content, re.DOTALL)
-                try:
-                    loc = {}
-                    if w_match: exec(f"w_list = {w_match.group(1)}", {}, loc)
-                    if s_match: exec(f"s_list = {s_match.group(1)}", {}, loc)
-                    if m_match: exec(f"m_list = {m_match.group(1)}", {}, loc)
-                    return loc.get('w_list', []), loc.get('s_list', []), loc.get('m_list', []), "OK", f"{repo}/{filename}"
-                except: continue
-    return None, None, None, "Error", "None"
-
 def update_github_file(path, content, msg="Update"):
     file_data, _ = get_github_file(REPO_NAME, path)
     sha = file_data['sha'] if file_data else None
@@ -56,26 +39,24 @@ def update_github_file(path, content, msg="Update"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA & CALCULATIONS ---
-words, sentences, motivation, sync_status, active_path = get_synced_data()
+# --- 3. DATA LOAD ---
 hist_file, _ = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 
-# A. Points Calculation
+# A. Calculations
 entries_count = full_text.count("DATE:")
 purchases = re.findall(r'PURCHASE: (.*)', full_text)
 claimed_achievements = re.findall(r'CLAIMED: (.*)', full_text)
 
+# B. Expanded Shop
 shop_items = {
-    "Studio Cat 🐈": 300,
-    "Golden Mic 🎤": 1000,
-    "Coffee Machine ☕": 150,
-    "Noise Panels 🧊": 500,
-    "Subwoofer 🔊": 800,
-    "Neon Sign 🏮": 400
+    "Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400,
+    "Noise Panels 🧊": 500, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000,
+    "Pro Headphones 🎧": 1200, "Synthesizer 🎹": 2000, "Gold Record 📀": 5000,
+    "Private Jet 🛩️": 50000, "Recording Mansion 🏰": 100000
 }
 
-# B. Streak Logic
+# C. Streak Logic
 dates_found = re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', full_text)
 unique_dates = sorted(list(set(dates_found)), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True)
 current_streak = 0
@@ -88,77 +69,77 @@ if unique_dates:
                 current_streak += 1
             else: break
 
-# C. Achievements Definition
+# D. Dynamic Streak Goal
+streak_milestones = [7, 14, 30, 60, 90, 150, 365]
+next_streak_goal = next((m for m in streak_milestones if m > current_streak), streak_milestones[-1])
+
+# E. Expanded Achievements
 achievements = [
-    {"id": "first_bar", "name": "First Session", "req": entries_count >= 1, "reward": 50, "desc": "Drop your first set of bars"},
-    {"id": "week_warrior", "name": "Week Warrior", "req": current_streak >= 7, "reward": 200, "desc": "Keep a 7-day streak"},
-    {"id": "lyric_lord", "name": "Lyric Lord", "req": entries_count >= 30, "reward": 500, "desc": "30 total journal entries"},
-    {"id": "fire_streak", "name": "Fire Breathing", "req": current_streak >= 30, "reward": 1000, "desc": "30-day streak milestone"}
+    {"id": "first_bar", "name": "Rookie", "req": entries_count >= 1, "reward": 50, "desc": "First entry"},
+    {"id": "streak_7", "name": "Weekly Hustle", "req": current_streak >= 7, "reward": 200, "desc": "7-day streak"},
+    {"id": "streak_14", "name": "Fortnight Flame", "req": current_streak >= 14, "reward": 500, "desc": "14-day streak"},
+    {"id": "streak_30", "name": "Monthly Legend", "req": current_streak >= 30, "reward": 1500, "desc": "30-day streak"},
+    {"id": "entries_50", "name": "Workaholic", "req": entries_count >= 50, "reward": 2000, "desc": "50 total entries"},
+    {"id": "whale", "name": "Big Spender", "req": len(purchases) >= 5, "reward": 1000, "desc": "Buy 5 shop items"}
 ]
 
 bonus_points = sum(a['reward'] for a in achievements if a['id'] in claimed_achievements)
 spent = sum(shop_items.get(item, 0) for item in purchases)
 user_points = (entries_count * 10) + bonus_points - spent
 
-# --- 4. THE UI ---
+# --- 4. UI ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤")
 
+# NAVIGATION TOP BAR
+col_nav1, col_nav2 = st.columns([4, 1])
+with col_nav2:
+    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
+
 with st.sidebar:
-    st.title("🕹️ Studio Control")
+    st.title("🕹️ Control")
     st.metric("Wallet", f"{user_points} RC")
-    st.metric("Streak", f"🔥 {current_streak} Days")
-    st.progress(min(current_streak / 30, 1.0), text="Goal: 30 Day Streak")
+    st.metric("Current Streak", f"🔥 {current_streak} Days")
+    st.write(f"**Next Goal:** {next_streak_goal} Days")
+    st.progress(min(current_streak / next_streak_goal, 1.0))
     st.divider()
-    if sync_status == "OK": st.success("Cloud Connected")
+    if st.button("🔄 Sync Cloud"): st.rerun()
 
 tab1, tab2, tab3, tab4 = st.tabs(["🎤 Write", "📜 History", "🛒 Shop", "🏆 Goals"])
 
-# TAB 1: WRITE
+# TAB 1: WRITE (Simplified for brevity)
 with tab1:
-    if words:
-        dw = words[day_of_year % len(words)]
-        st.header(dw['word'].upper())
-        st.info(f"📝 {sentences[day_of_year % len(sentences)]}")
-        if today_str in full_text: st.success("Session completed for today!")
-        user_lyrics = st.text_area("Drop your bars:", height=250)
-        if st.button("🚀 Save Bars"):
-            entry = f"DATE: {today_str}\nWORD: {dw['word']}\nLYRICS:\n{user_lyrics}\n"
-            update_github_file(HISTORY_PATH, entry + "------------------------------\n" + full_text)
-            st.rerun()
+    st.title("Rap Journal")
+    if today_str in full_text: st.success("Bars dropped for today! See you tomorrow.")
+    user_lyrics = st.text_area("Drop bars:", height=250)
+    if st.button("🚀 Save"):
+        update_github_file(HISTORY_PATH, f"DATE: {today_str}\nLYRICS:\n{user_lyrics}\n" + "---" + full_text)
+        st.rerun()
 
-# TAB 2: HISTORY
-with tab2:
-    st.header("The Vault")
-    for e in [x for x in full_text.split("------------------------------") if "DATE:" in x]:
-        st.text_area(label=e.split('\n')[0], value=e, height=150)
-
-# TAB 3: SHOP
+# TAB 3: SHOP (Grid)
 with tab3:
     st.header("Studio Shop")
-    cols = st.columns(2)
+    cols = st.columns(3)
     for i, (item, price) in enumerate(shop_items.items()):
-        with cols[i%2]:
-            st.subheader(item)
-            if item in purchases: st.write("✅ Owned")
-            elif st.button(f"Buy for {price}", key=item):
-                if user_points >= price:
+        with cols[i%3]:
+            st.write(f"**{item}**")
+            st.caption(f"{price} RC")
+            if item in purchases: st.write("✅")
+            elif user_points >= price:
+                if st.button("Buy", key=f"buy_{item}"):
                     update_github_file(HISTORY_PATH, f"PURCHASE: {item}\n" + full_text)
                     st.rerun()
+            else: st.button("Locked", disabled=True, key=f"lock_{item}")
 
-# TAB 4: GOALS & ACHIEVEMENTS
+# TAB 4: GOALS
 with tab4:
     st.header("Achievements")
     for a in achievements:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.write(f"**{a['name']}**")
-            st.caption(f"{a['desc']} (Reward: {a['reward']} RC)")
-        with col2:
-            if a['id'] in claimed_achievements:
-                st.write("✅ Claimed")
+        c1, c2 = st.columns([3, 1])
+        with c1: st.write(f"**{a['name']}** ({a['reward']} RC)")
+        with c2:
+            if a['id'] in claimed_achievements: st.write("Claimed")
             elif a['req']:
-                if st.button("Claim", key=a['id']):
+                if st.button("Claim", key=f"claim_{a['id']}"):
                     update_github_file(HISTORY_PATH, f"CLAIMED: {a['id']}\n" + full_text)
                     st.rerun()
-            else:
-                st.write("🔒 Locked")
+            else: st.write("🔒")

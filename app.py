@@ -37,7 +37,7 @@ def update_github_file(content, msg="Update"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA PARSING & ADVANCED ECONOMY ---
+# --- 3. DATA PARSING & ECONOMY ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
@@ -46,14 +46,7 @@ entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
-entry_map = {}
-for e in entries_raw:
-    m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
-    if m:
-        d_str = m.group(1)
-        if datetime.strptime(d_str, '%d/%m/%Y').date() <= today_date:
-            entry_map[d_str] = e
-
+entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
 unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
 
 current_streak = 0
@@ -73,8 +66,8 @@ achievements = [
 
 total_words = 0
 for entry in entries_raw:
-    lyric_content = entry.split("LYRICS:")[-1]
-    total_words += len(lyric_content.split())
+    lyric_part = entry.split("LYRICS:")[-1]
+    total_words += len(lyric_part.split())
 
 if total_words < 200: studio_level, level_name = 1, "Bedroom Producer"
 elif total_words < 500: studio_level, level_name = 2, "Underground Artist"
@@ -82,115 +75,104 @@ elif total_words < 1000: studio_level, level_name = 3, "Studio Sessionist"
 elif total_words < 2500: studio_level, level_name = 4, "Professional Rapper"
 else: studio_level, level_name = 5, "Chart Topper"
 
-session_rewards = len(unique_dates) * 10
-word_rewards = (total_words // 10) * 5
-bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
-spent_points = sum([shop_items.get(p, 0) for p in purchases])
-
-user_points = session_rewards + word_rewards + bonus_points - spent_points
+user_points = (len(unique_dates) * 10) + ((total_words // 10) * 5) + sum([a['rc'] for a in achievements if a['id'] in claimed]) - sum([shop_items.get(p, 0) for p in purchases])
 inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
 
-# --- 4. UI SETUP ---
+# --- 4. UI SETUP & ANIMATION CSS ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
 
-with st.sidebar:
-    profile_emoji = "👤"
-    if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
-    if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
-
-    st.title(f"{profile_emoji} Studio Control")
+st.markdown("""
+<style>
+    @keyframes floating { 0% {transform:translateY(0px);} 50% {transform:translateY(-10px);} 100% {transform:translateY(0px);} }
+    @keyframes pulse { 0% {transform:scale(1);} 50% {transform:scale(1.05);} 100% {transform:scale(1);} }
+    @keyframes neon { 0% {text-shadow: 0 0 5px #fff, 0 0 10px #ff00de;} 100% {text-shadow: 0 0 10px #fff, 0 0 20px #ff00de, 0 0 30px #ff00de;} }
+    @keyframes rotate { from {transform: rotate(0deg);} to {transform: rotate(360deg);} }
     
-    # Replaced st.metric with custom markdown to prevent "..." cutting off text
+    .float { animation: floating 3s ease-in-out infinite; text-align: center; }
+    .pulse { animation: pulse 1s ease-in-out infinite; text-align: center; }
+    .neon { color: #ff00de; font-weight: bold; animation: neon 1.5s ease-in-out infinite alternate; text-align: center; font-size: 20px; }
+    .disc { animation: rotate 4s linear infinite; border-radius: 50%; }
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.title("🕹️ Studio Control")
     st.markdown(f"### 💰 Wallet: **{user_points} RC**")
     st.markdown(f"### 🔥 Streak: **{current_streak} Days**")
-    
     st.divider()
-    st.write(f"📈 **Studio Level: {studio_level}**")
+    st.write(f"📈 **Level {studio_level}: {level_name}**")
     st.progress(min(total_words / 2500, 1.0))
-    st.caption(f"Role: {level_name} ({total_words}/2500 words)")
     
     st.divider()
     st.subheader("📦 Display Manager")
-    st.caption("Select items to show in your studio:")
-    show_items = {}
-    if not inventory:
-        st.write("No items yet. Visit the Shop!")
-    else:
-        for item in inventory:
-            show_items[item] = st.checkbox(f"Show {item}", value=True, key=f"sidebar_{item}")
-    
+    show_items = {item: st.checkbox(f"Show {item}", value=True, key=f"inv_{item}") for item in inventory}
     st.divider()
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
-    if st.button("🔄 Refresh Studio", use_container_width=True):
-        st.rerun()
 
-# --- 5. MAIN STUDIO SCREEN ---
-wearables = ""
-if "Rookie Cap 🧢" in inventory and show_items.get("Rookie Cap 🧢"): wearables += " 🧢"
-if "Silver Chain ⛓️" in inventory and show_items.get("Silver Chain ⛓️"): wearables += " ⛓️"
-st.title(f"🎤 My Studio{wearables}")
+# --- 5. VISUAL STUDIO SCREEN ---
+st.title("🎤 My Recording Studio")
 
-studio_cols = st.columns(5)
-if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
-    studio_cols[0].info("☕ **Brewing...**")
-if "Studio Cat 🐈" in inventory and show_items.get("Studio Cat 🐈"):
-    studio_cols[1].warning("🐈 **Napping...**")
-if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
-    studio_cols[2].error("🏮 **ON AIR**")
-if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
-    studio_cols[3].success("🔊 **Booming**")
-if "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
-    studio_cols[4].help("💿 **Top 100 Hit**")
+# Grid for items
+v1, v2, v3, v4, v5 = st.columns(5)
+
+with v1: # COFFEE MACHINE
+    if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
+        st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJqM2Z3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3bmZ3JlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/Xev9z0XG0O2KszJshO/giphy.gif" width="70"></div>', unsafe_allow_html=True)
+        st.caption("Fresh Brew")
+
+with v2: # STUDIO CAT
+    if "Studio Cat 🐈" in inventory and show_items.get("Studio Cat 🐈"):
+        st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKMGpxx323X3NqE/giphy.gif" width="80"></div>', unsafe_allow_html=True)
+        st.caption("Studio Manager")
+
+with v3: # NEON SIGN
+    if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
+        st.markdown('<br><div class="neon">🔴 ON AIR</div>', unsafe_allow_html=True)
+
+with v4: # SUBWOOFER
+    if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
+        st.markdown('<div class="pulse"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKXpT097m0R9F2E/giphy.gif" width="80"></div>', unsafe_allow_html=True)
+        st.caption("Feel the Bass")
+
+with v5: # GOLDEN MIC or PLAQUE
+    if "Golden Mic 🎤" in inventory and show_items.get("Golden Mic 🎤"):
+        st.markdown('<div class="float"><img src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l41lTfO3vDskGf7UY/giphy.gif" width="70"></div>', unsafe_allow_html=True)
+    elif "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
+        st.markdown('<div class="float"><img class="disc" src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueGZueCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKDkDbIDJieU2Zy/giphy.gif" width="60"></div>', unsafe_allow_html=True)
 
 st.divider()
 
 # --- 6. TABS ---
-t1, t2, t3, t4 = st.tabs(["✍️ Write Bars", "📂 Vault", "🏪 Shop", "🏆 Career"])
+t1, t2, t3, t4 = st.tabs(["✍️ Sessions", "📂 The Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
-    if today_str in entry_map: 
-        st.success("Today's session is locked in!")
+    if today_str in entry_map: st.success("Studio session complete for today!")
     else:
-        lyrics = st.text_area("Drop your fire here...", height=300)
-        if st.button("🚀 Record Session"):
+        lyrics = st.text_area("Record your bars...", height=250)
+        if st.button("🚀 Finalize Recording"):
             update_github_file(f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text)
             st.rerun()
 
 with t2:
-    st.header("The Vault")
     for i in range(7):
-        target_str = (today_date - timedelta(days=i)).strftime('%d/%m/%Y')
-        if target_str in entry_map:
-            with st.expander(f"📅 {target_str}"):
-                st.text(entry_map[target_str])
-        else:
-            with st.expander(f"❌ {target_str} (Missing)"):
-                st.write("No recording found.")
+        d = (today_date - timedelta(days=i)).strftime('%d/%m/%Y')
+        if d in entry_map:
+            with st.expander(f"📅 {d}"): st.text(entry_map[d])
 
 with t3:
-    st.header("Shop")
     cols = st.columns(3)
     for i, (item, price) in enumerate(shop_items.items()):
         with cols[i % 3]:
-            if item in purchases: st.write(f"✅ {item} Owned")
+            if item in purchases: st.write(f"✅ {item}")
             elif st.button(f"Buy {item} ({price} RC)"):
-                if user_points >= price:
-                    update_github_file(f"PURCHASE: {item}\n" + full_text)
-                    st.rerun()
-                else:
-                    st.error("Not enough RC!")
+                if user_points >= price: update_github_file(f"PURCHASE: {item}\n" + full_text); st.rerun()
 
 with t4:
-    st.header("Career Achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
-        with c1:
-            st.write(f"**{a['name']}**")
-            st.caption(f"How: {a['how']} | Reward: {a['reward_text']}")
+        with c1: st.write(f"**{a['name']}**"); st.caption(a['how'])
         with c2:
             if a['id'] in claimed: st.success("Claimed")
             elif a['req']:
-                if st.button("Claim", key=a['id']):
-                    update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
-                    st.rerun()
-            else: st.write("🔒 Locked")
+                if st.button("Claim", key=a['id']): update_github_file(f"CLAIMED: {a['id']}\n" + full_text); st.rerun()
+            else: st.write("🔒")

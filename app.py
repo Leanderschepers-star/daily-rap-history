@@ -6,75 +6,18 @@ import pytz
 import re
 from datetime import datetime, timedelta
 
-# --- FUNCTIONS: CALCULATIONS & REWARDS ---
-
-def calculate_streak(content):
-    if not content or "DATE:" not in content:
-        return 0
-    found_dates = set(re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', content))
-    if not found_dates:
-        return 0
-    date_objs = {datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates}
-    today = datetime.now(pytz.timezone('Europe/Brussels')).date()
-    yesterday = today - timedelta(days=1)
-    if today not in date_objs and yesterday not in date_objs:
-        return 0
-    current_check = today if today in date_objs else yesterday
-    streak = 0
-    while current_check in date_objs:
-        streak += 1
-        current_check -= timedelta(days=1)
-    return streak
-
-def calculate_points(content):
-    if not content:
-        return 0
-    entry_count = content.count("DATE:")
-    total_points = entry_count * 10
-    just_lyrics = re.sub(r'(DATE|WORD|LYRICS):.*', '', content)
-    words_list = just_lyrics.split()
-    total_points += (len(words_list) // 10) * 2
-    streak = calculate_streak(content)
-    total_points += (streak * 5)
-    if streak >= 7: total_points += 100
-    if streak >= 30: total_points += 1000
-    return total_points
-
-def get_pet_evolution(points, streak):
-    if streak >= 14 or points >= 1000:
-        return "🐯", "Studio Tiger (Elite)"
-    if streak >= 7 or points >= 500:
-        return "🐆", "Studio Leopard (Pro)"
-    return "🐱", "Studio Cat (Rookie)"
-
-# --- 1. ACCESS & SYNC ---
+# --- 1. CONFIG & SETUP ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 APP_1_REPO = "Leanderschepers-star/daily-rap-app" 
 APP_1_FILE = "streamlit_app.py" 
 REPO_NAME = "Leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
 
-def get_synced_words():
-    url = f"https://api.github.com/repos/{APP_1_REPO}/contents/{APP_1_FILE}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    r = requests.get(url, headers=headers)
-    if r.status_code == 200:
-        content = base64.b64decode(r.json()['content']).decode('utf-8')
-        local_vars = {}
-        try:
-            exec(content[content.find("words ="):content.find("]", content.find("words ="))+1], {}, local_vars)
-            exec(content[content.find("sentences ="):content.find("]", content.find("sentences ="))+1], {}, local_vars)
-            return local_vars.get('words'), local_vars.get('sentences')
-        except: return None, None
-    return None, None
-
-synced_words, synced_sentences = get_synced_words()
-
-# --- 2. TIME & GITHUB HELPERS ---
 belgium_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.now(belgium_tz)
 day_of_year = be_now.timetuple().tm_yday
 
+# --- 2. GITHUB & SYNC FUNCTIONS ---
 def get_github_file(path):
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -89,6 +32,71 @@ def update_github_file(path, content, msg="Update"):
     encoded = base64.b64encode(content.encode('utf-8')).decode('utf-8')
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
+
+def get_synced_data():
+    url = f"https://api.github.com/repos/{APP_1_REPO}/contents/{APP_1_FILE}"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content = base64.b64decode(r.json()['content']).decode('utf-8')
+        w_match = re.search(r"words\s*=\s*(\[.*?\])", content, re.DOTALL)
+        s_match = re.search(r"sentences\s*=\s*(\[.*?\])", content, re.DOTALL)
+        try:
+            import ast # Safer way to convert string to list
+            w_list = ast.literal_eval(w_match.group(1)) if w_match else []
+            s_list = ast.literal_eval(s_match.group(1)) if s_match else []
+            return w_list, s_list
+        except: return [], []
+    return [], []
+
+# --- 3. LOGIC: POINTS, STREAKS, & PURCHASES ---
+def calculate_stats(content):
+    if not content: return 0, 0, []
+    
+    # Streak Logic
+    found_dates = set(re.findall(r'DATE: (\d{2}/\d{2}/\d{4})', content))
+    date_objs = {datetime.strptime(d, '%d/%m/%Y').date() for d in found_dates}
+    today = be_now.date()
+    yesterday = today - timedelta(days=1)
+    
+    streak = 0
+    if today in date_objs or yesterday in date_objs:
+        curr = today if today in date_objs else yesterday
+        while curr in date_objs:
+            streak += 1
+            curr -= timedelta(days=1)
+            
+    # Points Logic (Earnings)
+    entry_points = content.count("DATE:") * 10
+    just_lyrics = re.sub(r'(DATE|WORD|LYRICS|PURCHASE):.*', '', content)
+    word_bonus = (len(just_lyrics.split()) // 10) * 2
+    streak_bonus = (streak * 5) + (100 if streak >= 7 else 0) + (1000 if streak >= 30 else 0)
+    total_earned = entry_points + word_bonus + streak_bonus
+    
+    # Spending Logic (Deductions)
+    purchases = re.findall(r'PURCHASE: (.*)', content)
+    prices = {"Studio Cat": 300, "Neon Layout": 150, "Gold Studio": 1000}
+    total_spent = sum(prices.get(item, 0) for item in purchases)
+    
+    return total_earned - total_spent, streak, purchases
+
+# --- 4. NOTIFICATION LOGIC ---
+def send_notification(streak, history_text):
+    today_str = be_now.strftime('%d/%m/%Y')
+    if f"NOTIFIED: {today_str}" not in history_text:
+        topic = "rappers_journal_123" 
+        url = f"https://ntfy.sh/{topic}"
+        msg = f"🔥 Your streak is at {streak} days! Time to write."
+        headers = {
+            "Title": "🎤 Rap Journal",
+            "Click": "https://share.streamlit.io/leanderschepers-star/daily-rap-history/main/app.py",
+            "Priority": "high"
+        }
+        try:
+            requests.post(url, data=msg, headers=headers)
+            return True
+        except: return False
+    return False
 
 # --- 4. DATA BANK (ADD YOUR FULL LISTS HERE) ---
 if not synced_words:
@@ -653,152 +661,95 @@ motivation = [
     "Your potential is waiting for you to unleash it.", "Keep working hard and stay true to your vision.",
     "Success is the final destination on your journey of excellence."
 ]
-# --- THE DATA BANK (Words, Sentences, & Logic Execution) ---
-if synced_words and synced_sentences:
-    words = synced_words
-    sentences = synced_sentences
-else:
-    # Fallback if sync fails
-    words = [{"word": "Mic Check"}]
-    sentences = ["The studio is quiet... Sync failed."]
-
-daily_word = words[day_of_year % len(words)]
-daily_sentence = sentences[day_of_year % len(sentences)]
-
-# --- 6. PAGE SETUP ---
+# --- 5. INITIALIZE PAGE ---
 st.set_page_config(page_title="Rap Journal", page_icon="📝")
+words, sentences = get_synced_data()
+hist_file = get_github_file(HISTORY_PATH)
+full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
+
+user_points, user_streak, user_inventory = calculate_stats(full_text)
+
+# Send Daily Notification once
+if send_notification(user_streak, full_text):
+    new_log = f"NOTIFIED: {be_now.strftime('%d/%m/%Y')}\n" + full_text
+    update_github_file(HISTORY_PATH, new_log, "Logged Notification Status")
+
+# --- 6. SIDEBAR: SHOP & ACHIEVEMENTS ---
+with st.sidebar:
+    st.title("🕹️ Studio Dashboard")
+    game_mode = st.toggle("Enable Game Mode", value=True)
+    
+    if game_mode:
+        st.subheader(f"💰 Balance: {user_points} RC")
+        
+        # ACHIEVEMENTS (Automatic Milestone Unlocks)
+        st.divider()
+        st.markdown("### 🏆 Achievements")
+        if user_streak >= 7: st.success("🎖️ Weekly Warrior (7 Day Streak)")
+        if user_streak >= 30: st.warning("👑 Rap Legend (30 Day Streak)")
+        
+        # THE SHOP (Purchase System)
+        st.divider()
+        st.markdown("### 🛒 Studio Shop")
+        
+        def render_shop_item(item_name, cost):
+            if item_name in user_inventory:
+                st.info(f"✅ {item_name} Owned")
+                return True
+            elif user_points >= cost:
+                if st.button(f"Buy {item_name} ({cost} RC)"):
+                    new_hist = f"PURCHASE: {item_name}\n" + full_text
+                    update_github_file(HISTORY_PATH, new_hist, f"Bought {item_name}")
+                    st.toast(f"Purchased {item_name}!")
+                    st.rerun()
+            else:
+                st.button(f"🔒 {item_name} ({cost} RC)", disabled=True)
+            return False
+
+        has_cat = render_shop_item("Studio Cat", 300)
+        has_neon = render_shop_item("Neon Layout", 150)
+        has_gold = render_shop_item("Gold Studio", 1000)
+
+        if has_neon and st.toggle("Activate Neon"):
+            st.markdown("<style>.stApp { background-color: #0E1117; color: #00FFA2; }</style>", unsafe_content_html=True)
+
+# --- 7. MAIN INTERFACE ---
+unlocked_crown = user_streak >= 30
+title_icon = "👑" if unlocked_crown else "🎤"
+st.title(f"{title_icon} Smart Rap Journal")
+
+if game_mode and "Studio Cat" in user_inventory:
+    st.markdown("### 🐱 Studio Cat: Chillin'")
 
 if "current_date" not in st.session_state:
     st.session_state.current_date = be_now.date()
 
 selected_date = st.date_input("Select Date:", value=st.session_state.current_date)
-st.session_state.current_date = selected_date 
 formatted_date = selected_date.strftime('%d/%m/%Y')
 
-# Recalculate word for the day based on selection
+# Display Word for selected day
 selected_day_of_year = selected_date.timetuple().tm_yday
-daily_word = words[selected_day_of_year % len(words)]
-daily_sentence = sentences[selected_day_of_year % len(sentences)]
+if words:
+    dw = words[selected_day_of_year % len(words)]
+    ds = sentences[selected_day_of_year % len(sentences)]
+    st.info(f"**WORD:** {dw['word'].upper()} | **PROMPT:** {ds}")
 
-# Load History & Stats
-hist_file = get_github_file(HISTORY_PATH)
-full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
-user_streak = calculate_streak(full_text)
-user_points = calculate_points(full_text)
-
-# --- SIDEBAR: SHOP & GAME TOGGLE ---
-with st.sidebar:
-    st.title("🕹️ Studio Dashboard")
-    game_mode = st.toggle("Enable Reward System", value=True)
-    pet_active = False 
-
-    if game_mode:
-        st.divider()
-        st.subheader("🛒 Studio Shop")
-        st.metric("Wallet Balance", f"{user_points} RC")
-
-        if user_points >= 150:
-            if st.checkbox("🌈 Neon Vibe"):
-                st.markdown("""<style>.stApp { background-color: #0E1117; color: #00FFA2; }
-                            [data-testid="stMetricValue"] { color: #00FFA2 !important; }</style>""", unsafe_content_html=True)
-
-        if user_points < 300:
-            st.button("🔒 Studio Cat (300 RC)", disabled=True)
-        else:
-            pet_active = st.checkbox("🐱 Summon Studio Cat")
-
-        if user_points >= 1000:
-            if st.checkbox("🔱 Gold Layout"):
-                st.markdown("""<style>.stApp { background-color: #2D2400; color: #FFD700; }</style>""", unsafe_content_html=True)
-    
-    st.divider()
-    st.markdown("[⬅️ Go to Daily Widget App](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
-
-# --- MAIN DISPLAY ---
-unlocked_crown = user_points >= 500  
-title_icon = "👑" if unlocked_crown else "🎤"
-st.title(f"{title_icon} Smart Rap Journal")
-
-# Pet Display (If active)
-if game_mode and pet_active:
-    pet_emoji, pet_rank = get_pet_evolution(user_points, user_streak)
-    st.markdown(f"""<div style="background:#1e1e1e; border:1px solid #00FFA2; border-radius:10px; padding:10px; text-align:center; width:fit-content;">
-                <h2 style="margin:0;">{pet_emoji}</h2><p style="margin:0; font-size:12px; color:#00FFA2;">{pet_rank}</p></div>""", unsafe_content_html=True)
-
-st.write(f"### Entry for: {formatted_date}")
-st.info(f"**WORD:** {daily_word['word'].upper()} | **PROMPT:** {daily_sentence}")
-
-col1, col2, col3 = st.columns([1, 1, 2])
-with col1: st.metric("Streak", f"{user_streak} Days", "🔥")
-with col2: 
-    if game_mode: st.metric("Credits", f"{user_points} RC", "💰")
-with col3:
-    prog = min(user_streak / 7, 1.0)
-    st.progress(prog, text=f"Weekly Goal: {user_streak}/7")
-
-if game_mode:
-    if user_streak >= 30: st.warning("🎖️ **STATUS: RAP LEGEND**")
-    elif user_streak >= 7: st.success("🌟 **STATUS: PROPHET**")
-    elif user_streak >= 3: st.info("🔥 **STATUS: RISING STAR**")
-
-st.divider()
-
-# --- 7/8. WRITING AREA ---
-existing_lyrics = ""
-if f"DATE: {formatted_date}" in full_text:
-    try:
-        parts = full_text.split(f"DATE: {formatted_date}")
-        relevant_part = parts[1].split("------------------------------")[0]
-        lyric_start = relevant_part.find("LYRICS:") + 7
-        existing_lyrics = relevant_part[lyric_start:].strip()
-        if existing_lyrics == "(No lyrics recorded)": existing_lyrics = ""
-    except: existing_lyrics = ""
-
-if "reset_count" not in st.session_state: st.session_state.reset_count = 0
-box_key = f"lyrics_{formatted_date}_{st.session_state.reset_count}"
-user_lyrics = st.text_area("Write your lyrics:", value=existing_lyrics, height=350, key=box_key)
-
-if st.button("🚀 Save Entry & Next Day"):
-    processed_lines = [line.lstrip()[0].upper() + line.lstrip()[1:] if line.lstrip() else "" for line in user_lyrics.split('\n')]
-    processed_lyrics = "\n".join(processed_lines)
-    status = processed_lyrics if processed_lyrics.strip() else "(No lyrics recorded)"
-    new_entry_content = f"DATE: {formatted_date}\nWORD: {daily_word['word'].upper()}\nLYRICS:\n{status}\n"
-    
-    entries = full_text.split("------------------------------")
-    updated_entries = []
-    found_date = False
-    for entry in entries:
-        if f"DATE: {formatted_date}" in entry:
-            updated_entries.append(new_entry_content)
-            found_date = True
-        elif entry.strip(): updated_entries.append(entry.strip() + "\n")
-
-    final_history = (new_entry_content + "------------------------------\n" + full_text) if not found_date else ("------------------------------\n".join(updated_entries) + "------------------------------\n")
-    update_github_file(HISTORY_PATH, final_history, f"Update Entry: {formatted_date}")
-    
-    st.session_state.reset_count += 1
-    st.session_state.current_date = selected_date + timedelta(days=1)
+# Writing & Saving
+user_lyrics = st.text_area("Write your lyrics:", height=300)
+if st.button("🚀 Save Entry"):
+    new_entry = f"DATE: {formatted_date}\nWORD: {dw['word'].upper()}\nLYRICS:\n{user_lyrics}\n"
+    update_github_file(HISTORY_PATH, new_entry + "------------------------------\n" + full_text, f"Entry: {formatted_date}")
+    st.success("Entry Saved to GitHub!")
     st.rerun()
 
-# --- 9. THE TIMELINE ---
+# --- 8. TIMELINE ---
 st.divider()
 st.subheader("📜 Your Rap Timeline")
 start_date = datetime(2025, 12, 19).date() 
 delta = be_now.date() - start_date
-
 for i in range(delta.days + 1):
     current_day = be_now.date() - timedelta(days=i)
-    day_str = current_day.strftime('%d/%m/%Y')
-    hist_word = words[current_day.timetuple().tm_yday % len(words)]
-    
-    lyric_content = ""
-    if f"DATE: {day_str}" in full_text:
-        try:
-            parts = full_text.split(f"DATE: {day_str}")
-            relevant_part = parts[1].split("------------------------------")[0]
-            lyric_content = relevant_part[relevant_part.find("LYRICS:") + 7:].strip()
-        except: lyric_content = ""
-
-    with st.expander(f"📅 {day_str} — Word: {hist_word['word'].upper()}"):
-        if lyric_content and "(No lyrics recorded)" not in lyric_content: st.text(lyric_content)
-        else: st.error("🚫 No lyrics recorded.")
+    d_str = current_day.strftime('%d/%m/%Y')
+    if f"DATE: {d_str}" in full_text:
+        with st.expander(f"📅 {d_str}"):
+            st.text(full_text.split(f"DATE: {d_str}")[1].split("------------------------------")[0].strip())

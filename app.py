@@ -68,29 +68,36 @@ today_word_count = len(entry_map.get(today_str, "").split())
 
 # --- 3. REWARD DEFINITIONS ---
 shop_items = {
-    "Coffee Machine ☕": 150, "Studio Cat 🐈": 300, 
-    "Neon 'VIBE' Sign 🏮": 450, "Bass Subwoofer 🔊": 800, 
-    "Smoke Machine 💨": 1200, "Golden Mic 🎤": 2500
+    "Coffee Machine ☕": 300, 
+    "Studio Cat 🐈": 600, 
+    "Neon 'VIBE' Sign 🏮": 1000, 
+    "Bass Subwoofer 🔊": 1800, 
+    "Smoke Machine 💨": 2500, 
+    "Golden Mic 🎤": 5000
 }
 
 achievements = [
-    {"id": "day1", "name": "First Day", "reward": "Underground UI 🧱", "target": 1, "current": len(db_dates), "unit": "session", "rc": 50},
-    {"id": "words_500", "name": "Wordsmith", "reward": "Classic Studio Theme 🎙️", "target": 500, "current": total_words, "unit": "total words", "rc": 300},
-    {"id": "week", "name": "Rising Star", "reward": "Blue Booth UI 🟦", "target": 7, "current": current_streak, "unit": "day streak", "rc": 500},
-    {"id": "all_tasks_5", "name": "Efficient Producer", "reward": "Neon 'LIVE' Sign 🔴", "target": 5, "current": len([x for x in tasks_done if "COMPLETION" in x]), "unit": "days cleared", "rc": 1000},
+    {"id": "day1", "name": "First Day", "reward": "Underground UI 🧱", "target": 1, "current": len(db_dates), "unit": "session", "rc": 100},
+    {"id": "words_500", "name": "Wordsmith", "reward": "Classic Studio Theme 🎙️", "target": 500, "current": total_words, "unit": "total words", "rc": 500},
+    {"id": "week", "name": "Rising Star", "reward": "Blue Booth UI 🟦", "target": 7, "current": current_streak, "unit": "day streak", "rc": 1000},
+    {"id": "words_2k", "name": "Lyricist Pro", "reward": "Silver Border Stats 🥈", "target": 2000, "current": total_words, "unit": "total words", "rc": 2000},
 ]
 
-# Daily Task Logic
-daily_tasks = [
-    {"id": "t1", "desc": "Record today's session", "req": today_str in entry_map, "rc": 40},
-    {"id": "t2", "desc": "Write 60+ words today", "req": today_word_count >= 60, "rc": 60},
-    {"id": "t3", "desc": "Check the Vault", "req": "vault_seen" in st.session_state, "rc": 20}
-]
+# --- THE POINT CALCULATION (1 point per 2 words) ---
+word_points = total_words // 2
+session_points = len(db_dates) * 20
+achievement_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
+chest_points = len([x for x in tasks_done if "COMPLETION" in x]) * 200
 
-# Points calculation (Simplified for performance)
-claimed_ach_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
-user_points = (len(db_dates) * 10) + ((total_words // 10) * 5) + claimed_ach_points
+user_points = word_points + session_points + achievement_points + chest_points
 user_points -= sum([shop_items.get(p, 0) for p in purchases])
+
+# --- 4. DAILY QUESTS ---
+daily_tasks = [
+    {"id": "t1", "desc": "Record today's session", "req": today_str in entry_map, "rc": 50},
+    {"id": "t2", "desc": "Write 100+ words today", "req": today_word_count >= 100, "rc": 100},
+    {"id": "t3", "desc": "Review the Vault", "req": "vault_seen" in st.session_state, "rc": 50}
+]
 
 def rebuild_and_save(new_map, new_pur, new_cla, new_theme, new_tasks):
     content = f"ACTIVE_THEME: {new_theme}\n"
@@ -102,7 +109,7 @@ def rebuild_and_save(new_map, new_pur, new_cla, new_theme, new_tasks):
             content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 4. THEME & UI ---
+# --- 5. UI & THEME ---
 st.set_page_config(page_title="Leander Studio", layout="wide")
 themes = {
     "Default Dark": "background: #0f0f0f;",
@@ -112,35 +119,32 @@ themes = {
     "Gold Vault UI 🟨": "background: radial-gradient(circle, #2b2100 0%, #0f0f0f 100%);"
 }
 
-# Gear Styling
-live_sign = "border-top: 5px solid #ff0000; box-shadow: 0px 5px 20px #ff0000;" if "Neon 'LIVE' Sign 🔴" in purchases or "all_tasks_5" in claimed else ""
-
 st.markdown(f"""
 <style>
-    .stApp {{ {themes.get(active_theme, themes['Default Dark'])} {live_sign} }}
+    .stApp {{ {themes.get(active_theme, themes['Default Dark'])} }}
     .stats-card {{ background: rgba(255, 255, 255, 0.04); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }}
     .quest-done {{ color: #00ff88; font-weight: bold; border-left: 4px solid #00ff88; padding-left: 10px; margin: 5px 0; }}
     .quest-pending {{ color: #888; border-left: 4px solid #444; padding-left: 10px; margin: 5px 0; }}
-    .quest-ready {{ color: #ffaa00; font-weight: bold; border-left: 4px solid #ffaa00; padding-left: 10px; cursor: pointer; }}
+    .quest-ready {{ color: #ffaa00; font-weight: bold; border-left: 4px solid #ffaa00; padding-left: 10px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR: QUEST BOARD ---
+# --- 6. SIDEBAR: QUEST BOARD ---
 with st.sidebar:
     st.title("🕹️ Studio Control")
-    st.metric("Wallet", f"{user_points} RC")
+    st.metric("Wallet", f"{user_points} RC", delta=f"{total_words} words total")
     
     st.divider()
     st.subheader("📋 Daily Quests")
     
-    current_tasks_done_today = [t for t in daily_tasks if f"{today_str}_{t['id']}" in tasks_done]
+    tasks_done_today = [t for t in daily_tasks if f"{today_str}_{t['id']}" in tasks_done]
     
     for t in daily_tasks:
         t_key = f"{today_str}_{t['id']}"
         if t_key in tasks_done:
-            st.markdown(f"<div class='quest-done'>✅ {t['desc']} (+{t['rc']}RC)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='quest-done'>✅ {t['desc']}</div>", unsafe_allow_html=True)
         elif t['req']:
-            st.markdown(f"<div class='quest-ready'>⭐ {t['desc']} (Ready!)</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='quest-ready'>⭐ {t['desc']}</div>", unsafe_allow_html=True)
             if st.button(f"Claim {t['rc']} RC", key=f"claim_{t['id']}"):
                 tasks_done.append(t_key)
                 rebuild_and_save(entry_map, purchases, claimed, active_theme, tasks_done)
@@ -148,15 +152,11 @@ with st.sidebar:
         else:
             st.markdown(f"<div class='quest-pending'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
     
-    # BIG COMPLETION REWARD
-    if len(current_tasks_done_today) == 3 and f"{today_str}_COMPLETION" not in tasks_done:
-        st.balloons()
-        if st.button("🎁 CLAIM DAILY CHEST (+100 RC)", use_container_width=True, type="primary"):
+    if len(tasks_done_today) == 3 and f"{today_str}_COMPLETION" not in tasks_done:
+        if st.button("🎁 CLAIM DAILY BONUS (+200 RC)", use_container_width=True, type="primary"):
             tasks_done.append(f"{today_str}_COMPLETION")
             rebuild_and_save(entry_map, purchases, claimed, active_theme, tasks_done)
             st.rerun()
-    elif f"{today_str}_COMPLETION" in tasks_done:
-        st.success("🎉 All Daily Tasks Cleared!")
 
     st.divider()
     available_themes = ["Default Dark"] + [a['reward'] for a in achievements if a['id'] in claimed]
@@ -165,10 +165,10 @@ with st.sidebar:
         rebuild_and_save(entry_map, purchases, claimed, sel_theme, tasks_done)
         st.rerun()
 
-# --- 6. DASHBOARD ---
+# --- 7. DASHBOARD ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f'<div class="stats-card"><h3>Words Today</h3><h2>{today_word_count}</h2></div>', unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="stats-card"><h3>Word Balance</h3><h2>{total_words}</h2><p>({word_points} RC)</p></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak}</h2></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="stats-card"><h3>Rank</h3><h2>Lv.{len(claimed)+1}</h2></div>', unsafe_allow_html=True)
 
@@ -215,13 +215,13 @@ with tabs[3]:
         col_a, col_b = st.columns([3, 1])
         with col_a:
             st.subheader(a['name'])
-            st.write(f"🎁 Reward: {a['reward']}")
+            st.write(f"🎁 Reward: {a['reward']} (+{a['rc']} RC)")
             st.progress(prog)
             st.caption(f"Progress: {a['current']} / {a['target']} {a['unit']}")
         with col_b:
             if a['id'] in claimed: st.success("Claimed")
             elif prog >= 1.0:
-                if st.button("Claim Reward", key=f"clm_ach_{a['id']}"):
+                if st.button("Claim", key=f"clm_ach_{a['id']}"):
                     claimed.append(a['id'])
                     rebuild_and_save(entry_map, purchases, claimed, active_theme, tasks_done)
                     st.rerun()

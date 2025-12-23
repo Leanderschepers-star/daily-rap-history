@@ -29,7 +29,7 @@ def get_github_file(path):
     except: return None
     return None
 
-def update_github_file(content, msg="Update"):
+def update_github_file(content, msg="Update Content"):
     file_data = get_github_file(HISTORY_PATH)
     sha = file_data['sha'] if file_data else None
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{HISTORY_PATH}"
@@ -42,7 +42,7 @@ def update_github_file(content, msg="Update"):
 hist_json = get_github_file(HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
-# Extract all data
+# Separate entries by the dash separator
 entries_raw = [e.strip() for e in re.split(r'-{3,}', full_text) if "DATE:" in e]
 purchases = re.findall(r'PURCHASE: (.*)', full_text)
 claimed = re.findall(r'CLAIMED: (.*)', full_text)
@@ -54,33 +54,24 @@ for e in entries_raw:
     if match:
         found_dates.append(datetime.strptime(match.group(1), '%d/%m/%Y').date())
 
-# Logic: Sort and Remove Duplicates
 unique_dates = sorted(list(set(found_dates)), reverse=True)
 
 # CALCULATE STRICT STREAK
 current_streak = 0
 if unique_dates:
     last_entry = unique_dates[0]
-    # If last entry is older than yesterday, streak is dead
     if last_entry >= yesterday_date:
         current_streak = 1
         for i in range(len(unique_dates) - 1):
             if (unique_dates[i] - unique_dates[i+1]).days == 1:
                 current_streak += 1
-            else:
-                break
-    else:
-        current_streak = 0
+            else: break
+    else: current_streak = 0
 
 # SHOP & ACHIEVEMENTS DATA
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
-achievements = [
-    {"id": "r1", "name": "First Bars", "req": len(unique_dates) >= 1, "reward": 50},
-    {"id": "s7", "name": "7 Day Streak", "req": current_streak >= 7, "reward": 200},
-    {"id": "s30", "name": "Monthly King", "req": current_streak >= 30, "reward": 1000}
-]
+achievements = [{"id": "r1", "name": "First Bars", "req": len(unique_dates) >= 1, "reward": 50}, {"id": "s7", "name": "7 Day Streak", "req": current_streak >= 7, "reward": 200}]
 
-# Calculate RC
 user_points = (len(unique_dates) * 10) + sum([a['reward'] for a in achievements if a['id'] in claimed]) - sum([shop_items.get(p, 0) for p in purchases])
 
 # --- 4. UI ---
@@ -96,30 +87,39 @@ with st.sidebar:
     st.metric("Streak", f"🔥 {current_streak} Days")
     if st.button("🔄 Force Refresh"): st.rerun()
 
-tab1, tab2, tab3, tab4 = st.tabs(["🎤 Write", "📜 History", "🛒 Shop", "🏆 Goals"])
+tab1, tab2, tab3, tab4 = st.tabs(["🎤 Write", "📜 Vault & Edit", "🛒 Shop", "🏆 Goals"])
 
+# TAB 1: WRITE
 with tab1:
     st.header("Daily Session")
-    if today_str in full_text:
-        st.success("✅ Bars already saved for today!")
-    
+    if today_str in full_text: st.success("✅ Bars already saved for today!")
     lyrics = st.text_area("Write here:", height=200)
     if st.button("🚀 Save Session"):
         if lyrics:
             new_text = f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text
-            update_github_file(new_text)
-            st.success("Saved!")
+            update_github_file(new_text, f"Entry for {today_str}")
             st.rerun()
 
+# TAB 2: HISTORY & EDITING
 with tab2:
     st.header("The Vault")
-    if not unique_dates:
+    if not entries_raw:
         st.write("No entries yet.")
     else:
-        for entry in entries_raw:
-            with st.expander(f"Entry: {entry.splitlines()[0]}"):
-                st.text(entry)
+        for i, entry in enumerate(entries_raw):
+            # Extract header for display
+            date_line = entry.splitlines()[0]
+            with st.expander(f"📝 {date_line}"):
+                # Local edit area
+                edited_lyrics = st.text_area("Edit text:", value=entry, height=200, key=f"edit_{i}")
+                if st.button("💾 Save Changes", key=f"btn_{i}"):
+                    # Find the old entry in the full text and replace it with the new one
+                    updated_full_text = full_text.replace(entry, edited_lyrics)
+                    update_github_file(updated_full_text, f"Edited {date_line}")
+                    st.success("Changes saved to GitHub!")
+                    st.rerun()
 
+# TAB 3: SHOP
 with tab3:
     st.header("Studio Store")
     c1, c2 = st.columns(2)
@@ -129,9 +129,10 @@ with tab3:
             if item in purchases: st.write(f"✅ {item} (Owned)")
             elif st.button(f"Buy {item} ({price} RC)"):
                 if user_points >= price:
-                    update_github_file(f"PURCHASE: {item}\n" + full_text)
+                    update_github_file(f"PURCHASE: {item}\n" + full_text, f"Purchased {item}")
                     st.rerun()
 
+# TAB 4: GOALS
 with tab4:
     st.header("Milestones")
     for a in achievements:
@@ -140,6 +141,5 @@ with tab4:
         if a['id'] in claimed: col2.write("Claimed")
         elif a['req']:
             if col2.button("Claim", key=a['id']):
-                update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
+                update_github_file(f"CLAIMED: {a['id']}\n" + full_text, f"Claimed {a['name']}")
                 st.rerun()
-        else: col2.write("🔒 Locked")

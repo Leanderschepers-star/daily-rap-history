@@ -95,7 +95,38 @@ def rebuild_and_save(new_map, new_pur, new_cla):
 
 # --- 6. UI ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
-st.markdown("<style>.float { animation: floating 3s ease-in-out infinite; display: inline-block; } @keyframes floating { 0% {transform:translateY(0px);} 50% {transform:translateY(-10px);} 100% {transform:translateY(0px);} }</style>", unsafe_allow_html=True)
+
+# CSS: Added 'sync-float' so the hat and body move as one unit
+st.markdown("""
+<style>
+    @keyframes sync-float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-8px); }
+        100% { transform: translateY(0px); }
+    }
+    .character-container {
+        animation: sync-float 3s ease-in-out infinite;
+        position: relative;
+        text-align: center;
+        background: rgba(255,255,255,0.05);
+        border-radius: 20px;
+        padding: 30px;
+        border: 1px solid #333;
+    }
+    .mannequin {
+        font-size: 90px;
+        filter: grayscale(100%) brightness(1.5); /* Makes the blue emoji look light grey/white */
+    }
+    .hat-overlay {
+        position: absolute;
+        top: 15px;
+        left: 0;
+        right: 0;
+        font-size: 45px;
+        z-index: 2;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 with st.sidebar:
     st.title("🕹️ Studio Control")
@@ -107,11 +138,19 @@ with st.sidebar:
     show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
-v1, v2, v3, v4, v5 = st.columns(5)
+# MANNEQUIN SECTION
+v1, v2, v3, v4, v5 = st.columns([1,1,2,1,1]) # Middle column is wider
 with v3:
-    cap = "🧢" if show_items.get("Rookie Cap 🧢") else ""
-    st.markdown(f'<div style="background: rgba(255,255,255,0.05); border-radius: 15px; padding: 20px; text-align: center; position: relative;"><div style="font-size: 80px;">👤</div><div class="float" style="position: absolute; top: 10px; left: 0; right: 0; font-size: 40px;">{cap}</div></div>', unsafe_allow_html=True)
+    cap_emoji = "🧢" if show_items.get("Rookie Cap 🧢") else ""
+    st.markdown(f"""
+    <div class="character-container">
+        <div class="hat-overlay">{cap_emoji}</div>
+        <div class="mannequin">👤</div>
+        <p style="margin-top:10px; color:gray; font-size:12px;">Artist Profile</p>
+    </div>
+    """, unsafe_allow_html=True)
 
+# TABS
 t1, t2, t3, t4 = st.tabs(["✍️ New Session", "📂 The Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
@@ -156,7 +195,7 @@ with t3:
                     st.rerun()
 
 with t4:
-    st.header("Career achievements")
+    st.header("🏆 Career Achievements")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:

@@ -40,73 +40,92 @@ def update_github_file(content, msg="Update"):
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
-# Regex to find blocks of sessions
-blocks = [b.strip() for b in re.split(r'-{10,}', full_text) if b.strip()]
-purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
-claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
+# Extract Purchases and Claims
+purchases = list(set(re.findall(r'PURCHASE: (.*)', full_text)))
+claimed = list(set(re.findall(r'CLAIMED: (.*)', full_text)))
 
+# Extract Lyrics using Regex (Robust to varying dash counts)
 entry_map = {}
+blocks = re.split(r'-{10,}', full_text)
 for b in blocks:
     if "DATE:" in b:
         date_match = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', b)
         if date_match:
             d_str = date_match.group(1)
-            # Only keep actual lyric content, strip out metadata for editing
-            lyric_content = b.split("LYRICS:")[-1].strip() if "LYRICS:" in b else ""
-            entry_map[d_str] = lyric_content
+            lyr = b.split("LYRICS:")[-1].strip() if "LYRICS:" in b else ""
+            if lyr: entry_map[d_str] = lyr
 
-# --- 4. ECONOMY & INVENTORY ---
-unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() >= START_DATE], reverse=True)
+# Filter for Start Date (19/12/2025)
+valid_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() >= START_DATE], reverse=True)
+
+# --- 4. STATS & ECONOMY ---
+current_streak = 0
+if valid_dates:
+    if (be_now.date() - valid_dates[0]).days <= 1:
+        current_streak = 1
+        for i in range(len(valid_dates)-1):
+            if (valid_dates[i] - valid_dates[i+1]).days == 1: current_streak += 1
+            else: break
+
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
-user_points = (len(unique_dates) * 10) + ((total_words // 10) * 5)
-if "first" in claimed: user_points += 50
-if "week" in claimed: user_points += 250
-shop_costs = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
-user_points -= sum([shop_costs.get(p, 0) for p in purchases])
-inventory = purchases + (["Rookie Cap 🧢"] if "first" in claimed else []) + (["Silver Chain ⛓️"] if "week" in claimed else [])
+shop_prices = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
 
-# --- 5. UI SETUP ---
+# Rewards Logic
+achievements = [
+    {"id": "first", "name": "Rookie of the Year", "desc": "Drop 1st bars", "req": len(valid_dates) >= 1, "rc": 50, "item": "Rookie Cap 🧢"},
+    {"id": "week", "name": "Weekly Grind", "desc": "7-day streak", "req": current_streak >= 7, "rc": 250, "item": "Silver Chain ⛓️"},
+    {"id": "month", "name": "Legendary Status", "desc": "30-day streak", "req": current_streak >= 30, "rc": 500, "item": "Platinum Plaque 💿"}
+]
+
+user_points = (len(valid_dates) * 10) + ((total_words // 10) * 5)
+user_points += sum([a['rc'] for a in achievements if a['id'] in claimed])
+user_points -= sum([shop_prices.get(p, 0) for p in purchases])
+
+inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed]
+
+# --- 5. CLEAN REBUILD FUNCTION ---
+def rebuild_and_save(new_entry_map, new_purchases, new_claims):
+    # Meta data at top
+    new_content = ""
+    for p in sorted(list(set(new_purchases))): new_content += f"PURCHASE: {p}\n"
+    for c in sorted(list(set(new_claims))): new_content += f"CLAIMED: {c}\n"
+    
+    # Sessions below
+    for d in sorted(new_entry_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
+        new_content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{new_entry_map[d]}\n------------------------------"
+    update_github_file(new_content)
+
+# --- 6. UI ---
 st.set_page_config(page_title="Studio Journal", layout="wide")
-st.markdown("""<style>
-    @keyframes floating { 0% {transform:translateY(0px);} 50% {transform:translateY(-10px);} 100% {transform:translateY(0px);} }
-    .float { animation: floating 3s ease-in-out infinite; display: inline-block; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: rgba(255,255,255,0.05); border-radius: 5px; padding: 10px; }
-</style>""", unsafe_allow_html=True)
+st.markdown("<style>.float { animation: floating 3s ease-in-out infinite; display: inline-block; } @keyframes floating { 0% {transform:translateY(0px);} 50% {transform:translateY(-10px);} 100% {transform:translateY(0px);} }</style>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
+    st.metric("Streak", f"{current_streak} Days")
     st.divider()
     show_items = {item: st.checkbox(f"Show {item}", value=True) for item in inventory}
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
 
-# --- 6. STUDIO VISUALS ---
+# Mannequin Visual
 v1, v2, v3, v4, v5 = st.columns(5)
 with v3:
     cap = "🧢" if show_items.get("Rookie Cap 🧢") else ""
     st.markdown(f'<div style="background: rgba(255,255,255,0.05); border-radius: 15px; padding: 20px; text-align: center; position: relative;"><div style="font-size: 80px;">👤</div><div class="float" style="position: absolute; top: 10px; left: 0; right: 0; font-size: 40px;">{cap}</div></div>', unsafe_allow_html=True)
 
-# --- 7. TABS ---
+# TABS
 t1, t2, t3, t4 = st.tabs(["✍️ New Session", "📂 The Vault", "🏪 Shop", "🏆 Career"])
 
 with t1:
-    st.subheader("New Session")
-    target_date = st.date_input("Date", value=be_now.date(), min_value=START_DATE)
-    t_str = target_date.strftime('%d/%m/%Y')
-    
-    if t_str in entry_map:
-        st.info(f"Day {t_str} is already in the Vault. Go there to edit it.")
+    target_date = st.date_input("Session Date", value=be_now.date(), min_value=START_DATE)
+    d_str = target_date.strftime('%d/%m/%Y')
+    if d_str in entry_map:
+        st.info("Already recorded. Go to Vault to edit.")
     else:
-        new_lyr = st.text_area("Drop your bars...", height=300)
-        if st.button("🚀 Record"):
-            # Construct new history: Metadata first, then sessions
-            meta = "\n".join([f"PURCHASE: {p}" for p in purchases] + [f"CLAIMED: {c}" for c in claimed])
-            sessions = f"\n------------------------------\nDATE: {t_str}\nLYRICS:\n{new_lyr}\n------------------------------"
-            # Add existing entries
-            for d, l in entry_map.items():
-                sessions += f"\nDATE: {d}\nLYRICS:\n{l}\n------------------------------"
-            update_github_file(meta + sessions)
+        new_lyr = st.text_area("Drop bars...", height=250)
+        if st.button("🚀 Record Session"):
+            entry_map[d_str] = new_lyr
+            rebuild_and_save(entry_map, purchases, claimed)
             st.rerun()
 
 with t2:
@@ -114,39 +133,39 @@ with t2:
     delta = (be_now.date() - START_DATE).days
     for i in range(delta + 1):
         day = (be_now.date() - timedelta(days=i)).strftime('%d/%m/%Y')
-        
         with st.expander(f"{'✅' if day in entry_map else '⚪'} {day}"):
             if day in entry_map:
-                # EDIT MODE FOR SPECIFIC DATE
-                edited_lyrics = st.text_area("Edit Lyrics", value=entry_map[day], height=200, key=f"edit_{day}")
-                if st.button("💾 Save Changes", key=f"btn_{day}"):
-                    # Rebuild the entire file with the updated lyric for this date
-                    entry_map[day] = edited_lyrics
-                    meta = "\n".join([f"PURCHASE: {p}" for p in purchases] + [f"CLAIMED: {c}" for c in claimed])
-                    sessions = ""
-                    for d, l in entry_map.items():
-                        sessions += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{l}\n------------------------------"
-                    update_github_file(meta + sessions)
-                    st.success(f"Updated {day}!")
+                edited = st.text_area("Edit", value=entry_map[day], height=200, key=f"v_{day}")
+                if st.button("💾 Save", key=f"b_{day}"):
+                    entry_map[day] = edited
+                    rebuild_and_save(entry_map, purchases, claimed)
                     st.rerun()
-            else:
-                st.write("No session recorded.")
+            else: st.write("Empty")
 
 with t3:
     st.header("Shop")
-    for item, price in shop_costs.items():
-        if item not in purchases:
-            if st.button(f"Buy {item} ({price}RC)"):
+    cols = st.columns(2)
+    for i, (item, price) in enumerate(shop_prices.items()):
+        with cols[i%2]:
+            if item in purchases: st.success(f"OWNED: {item}")
+            elif st.button(f"Buy {item} ({price}RC)"):
                 if user_points >= price:
-                    update_github_file(full_text + f"\nPURCHASE: {item}")
+                    purchases.append(item)
+                    rebuild_and_save(entry_map, purchases, claimed)
                     st.rerun()
 
 with t4:
-    st.header("Career")
-    # Quick claim for First Entry
-    if "first" not in claimed and len(unique_dates) >= 1:
-        if st.button("Claim Rookie Reward"):
-            update_github_file(full_text + "\nCLAIMED: first")
-            st.rerun()
-    elif "first" in claimed:
-        st.write("🏆 Rookie of the Year")
+    st.header("🏆 Career Achievements")
+    for a in achievements:
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.write(f"**{a['name']}**")
+            st.caption(f"{a['desc']} | Reward: {a['rc']} RC + {a['item']}")
+        with c2:
+            if a['id'] in claimed: st.success("Completed")
+            elif a['req']:
+                if st.button("Claim", key=f"claim_{a['id']}"):
+                    claimed.append(a['id'])
+                    rebuild_and_save(entry_map, purchases, claimed)
+                    st.rerun()
+            else: st.write("🔒 Locked")

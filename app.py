@@ -41,13 +41,13 @@ def update_github_file(content, msg="Update"):
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
-# 1. Basic Parsing
+# A. Basic Parsing
 all_blocks = [b.strip() for b in re.split(r'-{3,}', full_text) if b.strip()]
 entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
-# 2. Date Mapping & Streak
+# B. Date Mapping & Streak Calculation
 entry_map = {}
 for e in entries_raw:
     m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
@@ -66,35 +66,7 @@ if unique_dates:
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
 
-# 3. Word Count Calculation
-total_words = 0
-for entry in entries_raw:
-    # We grab everything after 'LYRICS:' to count the words
-    lyric_content = entry.split("LYRICS:")[-1]
-    words = lyric_content.split()
-    total_words += len(words)
-
-# 4. Rewards Math
-# Logic: 10 RC per session + 5 RC per 10 words
-session_rewards = len(unique_dates) * 10
-word_rewards = (total_words // 10) * 5
-
-# Add RC from achievements (defined later in your code, or move the list up)
-# For this to work, ensure the 'achievements' list is defined BEFORE this math
-bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
-spent_points = sum([shop_items.get(p, 0) for p in purchases])
-
-user_points = session_rewards + word_rewards + bonus_points - spent_points
-# STREAK 
-current_streak = 0
-if unique_dates:
-    if (today_date - unique_dates[0]).days <= 1:
-        current_streak = 1
-        for i in range(len(unique_dates)-1):
-            if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
-            else: break
-
-# --- DEFINITIONS ---
+# C. Definitions (Crucial to define BEFORE math)
 shop_items = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 300, "Neon Sign 🏮": 400, "Subwoofer 🔊": 800, "Golden Mic 🎤": 1000}
 achievements = [
     {"id": "first", "name": "Rookie of the Year", "how": "Submit 1st entry.", "req": len(unique_dates) >= 1, "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"},
@@ -102,10 +74,88 @@ achievements = [
     {"id": "month", "name": "Legendary Status", "how": "30-day streak.", "req": current_streak >= 30, "reward_text": "Platinum Plaque 💿", "rc": 0, "item": "Platinum Plaque 💿"}
 ]
 
-inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
+# D. Word Count Calculation
+total_words = 0
+for entry in entries_raw:
+    lyric_content = entry.split("LYRICS:")[-1]
+    total_words += len(lyric_content.split())
+
+# E. Studio Level Logic
+if total_words < 200: studio_level, level_name = 1, "Bedroom Producer"
+elif total_words < 500: studio_level, level_name = 2, "Underground Artist"
+elif total_words < 1000: studio_level, level_name = 3, "Studio Sessionist"
+elif total_words < 2500: studio_level, level_name = 4, "Professional Rapper"
+else: studio_level, level_name = 5, "Chart Topper"
+
+# F. Final Rewards Math
+session_rewards = len(unique_dates) * 10
+word_rewards = (total_words // 10) * 5
 bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
 spent_points = sum([shop_items.get(p, 0) for p in purchases])
-user_points = (len(unique_dates) * 10) + bonus_points - spent_points
+
+user_points = session_rewards + word_rewards + bonus_points - spent_points
+inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
+
+# --- 4. UI ---
+st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
+
+with st.sidebar:
+    # Artist Profile Emoji
+    profile_emoji = "👤"
+    if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
+    if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
+
+    st.title(f"{profile_emoji} Dashboard")
+    st.metric("Wallet", f"{user_points} RC")
+    st.metric("Streak", f"🔥 {current_streak} Days")
+    
+    st.divider()
+    st.write(f"📈 **Studio Level: {studio_level}**")
+    st.progress(min(total_words / 2500, 1.0))
+    st.caption(f"Role: {level_name}")
+    st.write(f"Total Words: `{total_words}`")
+    
+    st.divider()
+    st.subheader("📦 Display Manager")
+    show_items = {}
+    for item in inventory:
+        show_items[item] = st.checkbox(f"Show {item}", value=True)
+    
+    st.divider()
+    st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
+
+# --- 5. STUDIO SCREEN ---
+st.title("🎤 My Studio")
+
+# Physical Decor
+studio_cols = st.columns(5)
+if "Coffee Machine ☕" in inventory and show_items.get("Coffee Machine ☕"):
+    studio_cols[0].info("☕ **Brewing...**")
+if "Studio Cat 🐈" in inventory and show_items.get("Studio Cat 🐈"):
+    studio_cols[1].warning("🐈 **Napping...**")
+if "Neon Sign 🏮" in inventory and show_items.get("Neon Sign 🏮"):
+    studio_cols[2].error("🏮 **ON AIR**")
+if "Subwoofer 🔊" in inventory and show_items.get("Subwoofer 🔊"):
+    studio_cols[3].success("🔊 **Booming**")
+if "Platinum Plaque 💿" in inventory and show_items.get("Platinum Plaque 💿"):
+    studio_cols[4].help("💿 **Classic**")
+
+st.divider()
+
+# --- TABS ---
+t1, t2, t3, t4 = st.tabs(["✍️ Write", "📂 Vault", "🏪 Shop", "🏆 Career"])
+
+with t1:
+    if today_str in entry_map: 
+        st.success("Session recorded for today!")
+    else:
+        lyrics = st.text_area("Drop fire bars:", height=300)
+        if st.button("🚀 Record Session"):
+            update_github_file(f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text)
+            st.rerun()
+
+# (Tabs 2, 3, 4 logic follows the same structure as before)
+# ... [Rest of your Tab UI code]
 
 # --- 4. UI ---
 st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")

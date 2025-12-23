@@ -255,7 +255,13 @@ with t_car:
     st.header("Achievements")
     achs = [
         {"id": "day1", "name": "The Intern", "goal": "Record your 1st session", "target": 1, "curr": active_sessions},
-        {"id": "words_500", "name": "Wordsmith", "goal": "Reach 500 total words", "target": 500, "curr": total_words}
+        {"id": "words_500", "name": "Wordsmith", "goal": "Reach 500 total words", "target": 500, "curr": total_words},
+        {"id": "words_2500", "name": "Lyricist", "goal": "Reach 2,500 total words", "target": 2500, "curr": total_words},
+        {"id": "words_10k", "name": "Ghostwriter", "goal": "Reach 10,000 total words", "target": 10000, "curr": total_words},
+        {"id": "streak_7", "name": "Consistent", "goal": "Maintain a 7-day streak", "target": 7, "curr": current_streak},
+        {"id": "streak_30", "name": "Professional", "goal": "Maintain a 30-day streak", "target": 30, "curr": current_streak},
+        {"id": "gear_3", "name": "Gearhead", "goal": "Unlock 3 Recording Gear items", "target": 3, "curr": len([x for x in gear_items if x in purchases])},
+        {"id": "rack_4", "name": "Studio Architect", "goal": "Unlock all 4 Rack customizations", "target": 4, "curr": len([x for x in sidebar_customs if x in purchases])}
     ]
     for a in achs:
         prog = min(a['curr'] / a['target'], 1.0)

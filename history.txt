@@ -1,6 +1,7 @@
 ACTIVE_THEME: Underground UI 🧱
 CLAIMED: day1
 CLAIMED: first
+TASK_DONE: 23/12/2025_t1
 TASK_DONE: 23/12/2025_t3
 
 ------------------------------
@@ -30,7 +31,7 @@ it's hard for me to not interrupt
 get lost in my thoughts when they loud
 like a volcano waiting to erupt
 getting burned by every violence
-getting hurt by every silence 
+getting hurt by every silence
 ------------------------------
 ------------------------------
 DATE: 22/12/2025

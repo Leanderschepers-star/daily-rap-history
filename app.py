@@ -100,8 +100,8 @@ themes = {
     "Blue Booth UI 🟦": "background: radial-gradient(circle, #001a33 0%, #0f0f0f 100%);"
 }
 
-# GEAR EFFECTS (Acoustic Foam visual logic)
-foam_style = "border: 5px double #444; padding: 15px; background: #0a0a0a; border-radius: 10px;" if "Acoustic Foam 🔇" in purchases else ""
+# GEAR EFFECTS
+foam_border = "border: 6px double #444; padding: 15px; background: #0a0a0a !important; border-radius: 12px;" if "Acoustic Foam 🔇" in purchases else ""
 led_glow = "box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);" if "LED Strips 🌈" in purchases else ""
 
 st.set_page_config(page_title="Leander Studio", layout="wide")
@@ -113,7 +113,20 @@ st.markdown(f"""
     .ready {{ border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.1); }}
     .done {{ border-left-color: #00ff88; background: rgba(0, 255, 136, 0.1); color: #00ff88; }}
     .inventory-box {{ background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; border: 1px dashed #555; margin: 5px; text-align: center; font-size: 0.8em; }}
-    .booth-container {{ {foam_style} }}
+    
+    /* Center Reveal Animation */
+    .reveal-box {{ 
+        text-align: center; 
+        padding: 40px; 
+        background: rgba(0,0,0,0.9); 
+        border: 2px solid #ffaa00; 
+        border-radius: 20px;
+        margin: 20px auto;
+        max-width: 500px;
+    }}
+    
+    /* Fixed Foam Styling */
+    div[data-baseweb="textarea"] {{ {foam_border} }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,7 +134,6 @@ st.markdown(f"""
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet Balance", f"{user_points} RC")
-    
     st.divider()
     st.subheader("🔗 External Links")
     st.markdown("[🎤 Open Daily Bars & Prompts](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
@@ -130,8 +142,8 @@ with st.sidebar:
     st.subheader("🎨 Studio Theme")
     unlocked_themes = ["Default Dark"]
     if "day1" in claimed: unlocked_themes.append("Underground UI 🧱")
-    if "words_500" in claimed: unlocked_themes.append("Classic Studio 🎙️")
-    if "week" in claimed: unlocked_themes.append("Blue Booth UI 🟦")
+    if "words_500" in unlocked_themes: unlocked_themes.append("Classic Studio 🎙️")
+    if "week" in unlocked_themes: unlocked_themes.append("Blue Booth UI 🟦")
     
     selected_theme = st.selectbox("Switch Look", unlocked_themes, index=unlocked_themes.index(active_theme) if active_theme in unlocked_themes else 0)
     if selected_theme != active_theme:
@@ -144,7 +156,6 @@ with st.sidebar:
     gear_pool = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
     
     q_count = len(tasks_claimed_today)
-    st.write(f"Quest Progress: {q_count}/3")
     st.progress(q_count / 3)
     
     for t in daily_tasks:
@@ -153,34 +164,34 @@ with st.sidebar:
         if is_done: st.markdown(f"<div class='quest-item done'>✅ {t['desc']}</div>", unsafe_allow_html=True)
         elif t['req']:
             if st.button(f"Claim {t['rc']} RC", key=f"btn_{t['id']}"):
-                tasks_done.append(t_key)
-                save_all(); st.toast(f"💰 +{t['rc']} RC!"); st.rerun()
+                tasks_done.append(t_key); save_all(); st.rerun()
         else: st.markdown(f"<div class='quest-item'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
-    
-    # ACTUAL CHEST
-    if q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
-        chest_placeholder = st.empty()
-        if chest_placeholder.button("🎁 OPEN DAILY CHEST", use_container_width=True, type="primary"):
-            for msg in ["🥁 UNLOCKING...", "✨ SHUFFLING LOOT...", "🔥 ALMOST THERE..."]:
-                chest_placeholder.info(msg); time.sleep(0.7)
-            tasks_done.append(f"{today_str}_COMPLETION_RC200")
-            new_gear = next((g for g in gear_pool if g not in purchases), None)
-            if new_gear: purchases.append(new_gear); st.balloons(); chest_placeholder.success(f"🎊 FOUND: {new_gear}!")
-            else: chest_placeholder.success("🎊 +200 RC ADDED!")
-            save_all(); time.sleep(2); st.rerun()
 
-    # DEBUG TEST BUTTON
-    st.divider()
-    if st.button("🛠️ Debug: Test Chest Animation"):
-        test_box = st.empty()
-        for msg in ["🥁 TEST: DRUMROLL...", "✨ TEST: GENERATING...", "🎁 TEST: REVEAL!"]:
-            test_box.warning(msg); time.sleep(0.7)
-        st.balloons()
-        test_box.success("🎊 TEST COMPLETE: Imagine Gear Here!")
-        time.sleep(2); test_box.empty()
-
-# --- 7. TABS ---
+# --- 7. MAIN UI & REVEAL ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
+
+# THE CENTER REVEAL LOGIC
+if q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
+    reveal_area = st.empty()
+    if reveal_area.button("🎁 OPEN DAILY CHEST", use_container_width=True, type="primary"):
+        for msg in ["🎵 RECORDING LOOT...", "🎧 MIXING REWARDS...", "🎤 FINAL MASTERING..."]:
+            reveal_area.markdown(f"<div class='reveal-box'><h2>{msg}</h2></div>", unsafe_allow_html=True)
+            time.sleep(0.8)
+        
+        st.snow() # Snow is more "chill/musical" than balloons for a studio vibe
+        tasks_done.append(f"{today_str}_COMPLETION_RC200")
+        new_gear = next((g for g in gear_pool if g not in purchases), None)
+        
+        if new_gear:
+            purchases.append(new_gear)
+            reveal_area.markdown(f"<div class='reveal-box'><h1>🎸 NEW GEAR!</h1><h3>{new_gear}</h3><p>+200 RC added to wallet</p></div>", unsafe_allow_html=True)
+        else:
+            reveal_area.markdown(f"<div class='reveal-box'><h1>💰 PAYDAY!</h1><h3>+200 RC</h3></div>", unsafe_allow_html=True)
+        
+        save_all()
+        time.sleep(4)
+        st.rerun()
+
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak} Days</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Words Today</h3><h2>{today_word_count}</h2></div>', unsafe_allow_html=True)
@@ -189,26 +200,19 @@ with c3: st.markdown(f'<div class="stats-card"><h3>Rank</h3><h2>Lv.{len(claimed)
 t_rec, t_vau, t_shop, t_car = st.tabs(["✍️ Record Today", "📂 Timeline", "🏪 Shop", "🏆 Career"])
 
 with t_rec:
-    # Applying the "Padded" soundproof style if owned
-    st.markdown('<div class="booth-container">', unsafe_allow_html=True)
-    lyrics = st.text_area(f"Recording Booth: {today_str}", value=entry_map.get(today_str, ""), height=350)
-    st.markdown('</div>', unsafe_allow_html=True)
-    if st.button("🚀 Commit Today's Session"):
-        entry_map[today_str] = lyrics
-        save_all(); st.toast("Session Saved!"); st.rerun()
+    # Text area now automatically inherits Foam styling from CSS above
+    lyrics = st.text_area(f"Recording Booth: {today_str}", value=entry_map.get(today_str, ""), height=450)
+    if st.button("🚀 Commit Session"):
+        entry_map[today_str] = lyrics; save_all(); st.toast("Saved!"); st.rerun()
 
 with t_vau:
     total_days = (today_date - START_DATE).days
     for i in range(total_days + 1):
         target_date = today_date - timedelta(days=i)
         d_key = target_date.strftime('%d/%m/%Y')
-        content = entry_map.get(d_key, "")
-        status = "🔥" if content.strip() else "❄️"
-        with st.expander(f"{status} {d_key}"):
-            edited = st.text_area(f"Edit {d_key}", value=content, key=f"ed_{d_key}", height=200)
-            if st.button(f"Update {d_key}", key=f"up_{d_key}"):
-                entry_map[d_key] = edited
-                save_all(); st.rerun()
+        if d_key in entry_map:
+            with st.expander(f"🔥 {d_key}"):
+                st.write(entry_map[d_key])
 
 with t_shop:
     st.session_state["shop_seen"] = True
@@ -227,7 +231,3 @@ with t_car:
         with inv_cols[idx]:
             if gear in purchases: st.markdown(f"<div class='inventory-box'>{gear}</div>", unsafe_allow_html=True)
             else: st.markdown(f"<div class='inventory-box' style='opacity:0.3;'>🔒 Locked</div>", unsafe_allow_html=True)
-    
-    st.divider()
-    st.header("Career Milestones")
-    # Achievements logic (Day 1, Wordsmith, etc.) goes here as before

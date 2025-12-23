@@ -1,13 +1,10 @@
 import streamlit as st
-import datetime
-import requests
-import base64
-import pytz
-import re
+import datetime, requests, base64, pytz, re
 from datetime import datetime, timedelta
 
 # --- 1. CONFIG ---
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+# Double check these names on GitHub. Are they exactly like this?
 APP_1_REPO = "Leanderschepers-star/daily-rap-app" 
 APP_1_FILE = "streamlit_app.py" 
 REPO_NAME = "Leanderschepers-star/daily-rap-history"
@@ -18,17 +15,24 @@ be_now = datetime.now(belgium_tz)
 day_of_year = be_now.timetuple().tm_yday
 today_str = be_now.strftime('%d/%m/%Y')
 
-# --- 2. THE ENGINE ---
+# --- 2. THE ENGINE (WITH DEBUGGING) ---
 def get_github_file(repo, path):
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
     try:
         r = requests.get(url, headers=headers)
-        return r.json() if r.status_code == 200 else None
-    except: return None
+        if r.status_code == 200:
+            return r.json(), "OK"
+        else:
+            return None, f"Error {r.status_code}: {r.reason}"
+    except Exception as e:
+        return None, str(e)
 
 def update_github_file(path, content, msg="Update"):
-    file_data = get_github_file(REPO_NAME, path)
+    file_data, status = get_github_file(REPO_NAME, path)
     sha = file_data['sha'] if file_data else None
     url = f"https://api.github.com/repos/{REPO_NAME}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
@@ -37,9 +41,10 @@ def update_github_file(path, content, msg="Update"):
     return requests.put(url, json=data, headers=headers)
 
 def get_synced_data():
-    file_json = get_github_file(APP_1_REPO, APP_1_FILE)
+    file_json, status = get_github_file(APP_1_REPO, APP_1_FILE)
     if file_json:
         content = base64.b64decode(file_json['content']).decode('utf-8')
+        # We look for the lists in your code
         w_match = re.search(r"words\s*=\s*(\[.*?\])", content, re.DOTALL)
         s_match = re.search(r"sentences\s*=\s*(\[.*?\])", content, re.DOTALL)
         m_match = re.search(r"motivation\s*=\s*(\[.*?\])", content, re.DOTALL)
@@ -48,9 +53,10 @@ def get_synced_data():
             if w_match: exec(f"w_list = {w_match.group(1)}", {}, loc)
             if s_match: exec(f"s_list = {s_match.group(1)}", {}, loc)
             if m_match: exec(f"m_list = {m_match.group(1)}", {}, loc)
-            return loc.get('w_list', []), loc.get('s_list', []), loc.get('m_list', [])
-        except: return [], [], []
-    return None, None, None
+            return loc.get('w_list', []), loc.get('s_list', []), loc.get('m_list', []), "OK"
+        except Exception as e:
+            return [], [], [], f"Regex Error: {e}"
+    return None, None, None, status
 
 def calculate_stats(content):
     if not content: return 0, 0, []
@@ -68,21 +74,29 @@ def calculate_stats(content):
     spent = sum(prices.get(item, 0) for item in purchases)
     return earned - spent, streak, purchases
 
-# --- 3. DATA PROCESSING ---
-words, sentences, motivation = get_synced_data()
-hist_file = get_github_file(REPO_NAME, HISTORY_PATH)
+# --- 3. DATA FETCHING ---
+words, sentences, motivation, sync_status = get_synced_data()
+hist_file, hist_status = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_file['content']).decode('utf-8') if hist_file else ""
 user_points, user_streak, user_inventory = calculate_stats(full_text)
 
-# --- 4. THE UI (SAFE RENDER) ---
+# --- 4. THE UI ---
 st.set_page_config(page_title="Rap Studio", page_icon="🎤")
 
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"{user_streak} Days")
+    
     st.divider()
-    st.subheader("🛒 Shop")
+    st.subheader("📡 Connection Status")
+    if sync_status == "OK":
+        st.success("Sync: Connected ✅")
+    else:
+        st.error(f"Sync: {sync_status} ❌")
+        st.caption(f"Target: {APP_1_REPO}")
+
+    st.divider()
     if "Studio Cat" not in user_inventory:
         if st.button(f"Buy Studio Cat (300 RC)", disabled=(user_points < 300)):
             update_github_file(HISTORY_PATH, "PURCHASE: Studio Cat\n" + full_text, "Bought Cat")
@@ -91,24 +105,18 @@ with st.sidebar:
 
 st.title("🎤 Rap Journal")
 
-# Logic to prevent UI crash if Sync fails
 if words:
     dw = words[day_of_year % len(words)]
-    ds = sentences[day_of_year % len(sentences)]
-    dm = motivation[day_of_year % len(motivation)]
-    
     st.header(dw['word'].upper())
-    st.info(f"📝 {ds}")
-    st.warning(f"🔥 {dm}")
+    st.info(f"📝 {sentences[day_of_year % len(sentences)]}")
+    st.warning(f"🔥 {motivation[day_of_year % len(motivation)]}")
 else:
-    st.error("⚠️ Syncing words from App 1...")
-    st.info("The UI is active, but I can't find your words yet. Check your GitHub Token.")
-    dw = {"word": "RETRY"} # Dummy data to prevent crash
+    st.error("No words found. Please check the Connection Status in the sidebar.")
 
-# Writing Area
 user_lyrics = st.text_area("Drop your bars:", height=300)
 if st.button("🚀 Save Bars"):
-    entry = f"DATE: {today_str}\nWORD: {dw['word']}\nLYRICS:\n{user_lyrics}\n"
-    update_github_file(HISTORY_PATH, entry + "------------------------------\n" + full_text)
-    st.success("Bars saved!")
-    st.rerun()
+    if words:
+        entry = f"DATE: {today_str}\nWORD: {dw['word']}\nLYRICS:\n{user_lyrics}\n"
+        update_github_file(HISTORY_PATH, entry + "------------------------------\n" + full_text)
+        st.success("Bars saved!")
+        st.rerun()

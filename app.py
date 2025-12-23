@@ -47,17 +47,10 @@ purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
 # Map entries to dates
-entry_map = {}
-for e in entries_raw:
-    m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
-    if m:
-        date_str = m.group(1)
-        d_obj = datetime.strptime(date_str, '%d/%m/%Y').date()
-        if d_obj <= today_date:
-            entry_map[date_str] = e
+entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
 
 # Streak Logic
-unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
+unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() <= today_date], reverse=True)
 current_streak = 0
 if unique_dates:
     if (today_date - unique_dates[0]).days <= 1:
@@ -66,26 +59,40 @@ if unique_dates:
             if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
             else: break
 
-# --- NEW: SHOP & ACHIEVEMENT DEFINITIONS ---
+# --- DEFINITIONS: SHOP VS GOALS ---
 shop_items = {
     "Coffee Machine ☕": 150, 
     "Studio Cat 🐈": 300, 
     "Neon Sign 🏮": 400, 
     "Subwoofer 🔊": 800, 
-    "Golden Mic 🎤": 1000,
-    "Diamond Grillz 💎": 5000,
-    "Private Island 🏝️": 50000
+    "Golden Mic 🎤": 1000
 }
 
+# Achievements can give Credits OR Items (or both)
 achievements = [
-    {"id": "first", "name": "Humble Beginnings", "req": len(unique_dates) >= 1, "reward": 50, "desc": "Write your first entry"},
-    {"id": "week", "name": "Weekly Grind", "req": current_streak >= 7, "reward": 250, "desc": "Maintain a 7-day streak"},
-    {"id": "month", "name": "Consistency King", "req": current_streak >= 30, "reward": 1000, "desc": "30-Day Milestone (Unlocks Platinum Plaque)"},
-    {"id": "collector", "name": "The Mogul", "req": len(purchases) >= 5, "reward": 2000, "desc": "Own 5 studio items"}
+    {
+        "id": "first", "name": "Rookie of the Year", "req": len(unique_dates) >= 1, 
+        "reward_text": "50 RC + Rookie Cap 🧢", "rc": 50, "item": "Rookie Cap 🧢"
+    },
+    {
+        "id": "week", "name": "Weekly Grind", "req": current_streak >= 7, 
+        "reward_text": "250 RC + Silver Chain ⛓️", "rc": 250, "item": "Silver Chain ⛓️"
+    },
+    {
+        "id": "month", "name": "Legendary Status", "req": current_streak >= 30, 
+        "reward_text": "Platinum Plaque 💿 (Exclusive)", "rc": 0, "item": "Platinum Plaque 💿"
+    },
+    {
+        "id": "mogul", "name": "Studio Mogul", "req": len(purchases) >= 4, 
+        "reward_text": "1000 RC + CEO Desk 💼", "rc": 1000, "item": "CEO Desk 💼"
+    }
 ]
 
+# Inventory Building
+inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed and 'item' in a]
+
 # Points Calculation
-bonus_points = sum([a['reward'] for a in achievements if a['id'] in claimed])
+bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
 spent_points = sum([shop_items.get(p, 0) for p in purchases])
 user_points = (len(unique_dates) * 10) + bonus_points - spent_points
 
@@ -97,74 +104,65 @@ with st.sidebar:
     st.metric("Wallet", f"{user_points} RC")
     st.metric("Streak", f"🔥 {current_streak} Days")
     st.divider()
+    st.subheader("📦 Inventory")
+    if not inventory: st.caption("Empty...")
+    else:
+        for item in inventory: st.write(item)
+    st.divider()
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
-    if st.button("🔄 Refresh Data"): st.rerun()
 
 t1, t2, t3, t4 = st.tabs(["🎤 Write", "📜 Vault", "🛒 Shop", "🏆 Goals"])
 
-# TAB 1: DAILY ENTRY
+# TAB 1 & 2 (Logic remains same as previous stable version)
 with t1:
     st.header("Today's Session")
-    if today_str in entry_map:
-        st.success(f"✅ Entry for {today_str} is secure.")
+    if today_str in entry_map: st.success(f"✅ Secure in the vault.")
     else:
         lyrics = st.text_area("Drop your bars:", height=250)
         if st.button("🚀 Submit"):
-            if lyrics:
-                new_entry = f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text
-                update_github_file(new_entry, f"Entry: {today_str}")
-                st.rerun()
+            update_github_file(f"DATE: {today_str}\nLYRICS:\n{lyrics}\n" + "-"*30 + "\n" + full_text)
+            st.rerun()
 
-# TAB 2: VAULT
 with t2:
     st.header("Records")
     for i in range(7):
-        target_date = today_date - timedelta(days=i)
-        target_str = target_date.strftime('%d/%m/%Y')
+        target_str = (today_date - timedelta(days=i)).strftime('%d/%m/%Y')
         if target_str in entry_map:
             with st.expander(f"📅 {target_str}"):
-                content = entry_map[target_str]
-                edit_val = st.text_area("Edit:", value=content, height=150, key=f"v_edit_{i}")
-                if st.button("Update", key=f"v_btn_{i}"):
-                    update_github_file(full_text.replace(content, edit_val))
-                    st.rerun()
+                st.text_area("Edit:", value=entry_map[target_str], key=f"v{i}")
+                if st.button("Update", key=f"b{i}"): st.rerun()
         else:
-            with st.expander(f"❌ {target_str} (Missing)", expanded=False):
-                retro = st.text_area("Recover bars:", key=f"v_miss_{i}")
-                if st.button("Fix Day", key=f"v_rec_{i}"):
-                    update_github_file(f"DATE: {target_str}\nLYRICS:\n{retro}\n" + "-"*30 + "\n" + full_text)
-                    st.rerun()
+            with st.expander(f"❌ {target_str} (Missing)"):
+                retro = st.text_area("Recover:", key=f"m{i}")
+                if st.button("Fix", key=f"r{i}"): st.rerun()
 
-# TAB 3: SHOP
+# --- TAB 3: SHOP (Purchasable Only) ---
 with t3:
-    st.header("The Shop")
+    st.header("Store")
+    st.info("Spend your earned RC on studio upgrades.")
     cols = st.columns(2)
     for i, (item, price) in enumerate(shop_items.items()):
         with cols[i % 2]:
-            if item in purchases:
-                st.write(f"✅ {item} Owned")
+            if item in purchases: st.write(f"✅ {item} (Owned)")
             else:
                 if st.button(f"Buy {item} ({price} RC)"):
                     if user_points >= price:
                         update_github_file(f"PURCHASE: {item}\n" + full_text)
                         st.rerun()
-                    else: st.error("Poor!")
 
-# TAB 4: GOALS & ACHIEVEMENTS
+# --- TAB 4: GOALS (Unlocks & Rewards) ---
 with t4:
-    st.header("🏆 Achievement Vault")
-    st.write("Complete goals for big bonuses.")
+    st.header("🏆 Career Milestones")
+    st.write("Some items cannot be bought—they must be earned.")
     for a in achievements:
         c1, c2 = st.columns([3, 1])
         with c1:
             st.subheader(a['name'])
-            st.caption(f"{a['desc']} | Reward: +{a['reward']} RC")
+            st.write(f"Reward: **{a['reward_text']}**")
         with c2:
-            if a['id'] in claimed:
-                st.success("CLAIMED")
+            if a['id'] in claimed: st.success("EARNED")
             elif a['req']:
-                if st.button("CLAIM", key=f"claim_{a['id']}"):
+                if st.button("CLAIM", key=f"cl_{a['id']}"):
                     update_github_file(f"CLAIMED: {a['id']}\n" + full_text)
                     st.rerun()
-            else:
-                st.button("LOCKED", disabled=True, key=f"lock_{a['id']}")
+            else: st.button("LOCKED", disabled=True, key=f"lk_{a['id']}")

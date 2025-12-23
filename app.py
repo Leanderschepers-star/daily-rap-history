@@ -67,7 +67,6 @@ while True:
     else: break
 
 active_sessions = len([k for k, v in entry_map.items() if v.strip()])
-# Logic: Summing rewards directly from tasks_done list ensures they aren't lost
 bonus_rc = sum([int(re.search(r'_RC(\d+)', x).group(1)) if "_RC" in x else 0 for x in tasks_done])
 user_points = (total_words // 2) + (active_sessions * 10) + bonus_rc
 shop_prices = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 400, "Neon 'VIBE' Sign 🏮": 800, "Bass Subwoofer 🔊": 1500, "Smoke Machine 💨": 2500, "Golden Mic 🎤": 5000}
@@ -93,36 +92,74 @@ def save_all(theme_to_save=None):
         content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{entry_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 5. UI ---
-st.set_page_config(page_title="Leander Studio", layout="wide")
-st.markdown(f"<style>.stApp {{ background: #0f0f0f; color: white; }} .stats-card {{ background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }} .quest-item {{ padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #444; background: rgba(255,255,255,0.02); }} .ready {{ border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.1); }} .done {{ border-left-color: #00ff88; background: rgba(0, 255, 136, 0.1); color: #00ff88; }}</style>", unsafe_allow_html=True)
+# --- 5. UI & THEMES ---
+themes = {
+    "Default Dark": "background: #0f0f0f;",
+    "Underground UI 🧱": "background: linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://www.transparenttextures.com/patterns/brick-wall.png'); background-color: #1a1a1a;",
+    "Classic Studio 🎙️": "background: #1e272e;",
+    "Blue Booth UI 🟦": "background: radial-gradient(circle, #001a33 0%, #0f0f0f 100%);"
+}
 
+st.set_page_config(page_title="Leander Studio", layout="wide")
+st.markdown(f"""
+<style>
+    .stApp {{ {themes.get(active_theme, themes['Default Dark'])} color: white; }}
+    .stats-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; }}
+    .quest-item {{ padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #444; background: rgba(255,255,255,0.02); }}
+    .ready {{ border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.1); }}
+    .done {{ border-left-color: #00ff88; background: rgba(0, 255, 136, 0.1); color: #00ff88; }}
+    .inventory-box {{ background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; border: 1px dashed #555; margin: 5px; text-align: center; }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("🕹️ Studio Control")
     st.metric("Wallet Balance", f"{user_points} RC")
+    
+    st.divider()
+    st.subheader("🔗 External Links")
+    st.markdown("[🎤 Open Daily Bars & Prompts](https://daily-rap-app.streamlit.app)")
+    
+    st.divider()
+    st.subheader("🎨 Studio Theme")
+    unlocked_themes = ["Default Dark"]
+    if "day1" in claimed: unlocked_themes.append("Underground UI 🧱")
+    if "words_500" in claimed: unlocked_themes.append("Classic Studio 🎙️")
+    if "week" in claimed: unlocked_themes.append("Blue Booth UI 🟦")
+    
+    selected_theme = st.selectbox("Switch Look", unlocked_themes, index=unlocked_themes.index(active_theme) if active_theme in unlocked_themes else 0)
+    if selected_theme != active_theme:
+        save_all(theme_to_save=selected_theme)
+        st.rerun()
+
     st.divider()
     st.subheader("📋 Daily Quests")
     tasks_claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
+    gear_pool = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
+    
     for t in daily_tasks:
-        t_key = f"{today_str}_{t['id']}_RC{t['rc']}" # Store the RC value inside the key
+        t_key = f"{today_str}_{t['id']}_RC{t['rc']}"
         is_done = any(t['id'] in x for x in tasks_done if today_str in x)
         if is_done: st.markdown(f"<div class='quest-item done'>✅ {t['desc']}</div>", unsafe_allow_html=True)
         elif t['req']:
             if st.button(f"Claim {t['rc']} RC", key=f"btn_{t['id']}"):
                 tasks_done.append(t_key)
-                save_all()
-                st.toast(f"💰 +{t['rc']} RC added to wallet!")
-                st.rerun()
+                save_all(); st.toast(f"💰 +{t['rc']} RC!"); st.rerun()
         else: st.markdown(f"<div class='quest-item'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
     
     if len(tasks_claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
-        if st.button("🎁 CLAIM DAILY CHEST (+200 RC)", use_container_width=True, type="primary"):
+        if st.button("🎁 CLAIM DAILY CHEST (+200 RC + GEAR)", use_container_width=True, type="primary"):
             tasks_done.append(f"{today_str}_COMPLETION_RC200")
-            save_all()
-            st.toast("🎁 BOOM! Daily Chest opened: +200 RC!")
-            st.rerun()
+            new_gear = next((g for g in gear_pool if g not in purchases), None)
+            if new_gear:
+                purchases.append(new_gear)
+                st.balloons(); st.toast(f"🎁 UNLOCKED: {new_gear}!")
+            else:
+                st.toast("🎁 +200 RC! (All Gear Collected)")
+            save_all(); st.rerun()
 
-# --- 6. TABS ---
+# --- 7. TABS ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak} Days</h2></div>', unsafe_allow_html=True)
@@ -135,7 +172,7 @@ with t_rec:
     lyrics = st.text_area(f"Recording Booth: {today_str}", value=entry_map.get(today_str, ""), height=350)
     if st.button("🚀 Commit Today's Session"):
         entry_map[today_str] = lyrics
-        save_all(); st.toast("Session Saved Successfully!"); st.rerun()
+        save_all(); st.toast("Session Saved!"); st.rerun()
 
 with t_vau:
     total_days = (today_date - START_DATE).days
@@ -157,11 +194,19 @@ with t_shop:
         with (sc1 if i%2==0 else sc2):
             if item in purchases: st.success(f"OWNED: {item}")
             elif st.button(f"Buy {item} ({price} RC)", key=f"sh_{i}"):
-                if user_points >= price: 
-                    purchases.append(item); save_all(); st.toast(f"Purchased {item}!"); st.rerun()
+                if user_points >= price: purchases.append(item); save_all(); st.rerun()
                 else: st.error("Not enough RC!")
 
 with t_car:
+    st.header("Studio Inventory")
+    all_gear = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
+    inv_cols = st.columns(5)
+    for idx, gear in enumerate(all_gear):
+        with inv_cols[idx]:
+            if gear in purchases: st.markdown(f"<div class='inventory-box'>{gear}</div>", unsafe_allow_html=True)
+            else: st.markdown(f"<div class='inventory-box' style='opacity:0.3;'>🔒 Locked</div>", unsafe_allow_html=True)
+    
+    st.divider()
     st.header("Career Milestones")
     achievements = [
         {"id": "day1", "name": "First Day", "goal": "Write your first entry", "target": 1, "curr": active_sessions},
@@ -176,6 +221,6 @@ with t_car:
         if a['id'] in claimed: st.success("Claimed")
         elif prog >= 1.0:
             if st.button(f"Unlock Reward", key=f"ac_{a['id']}"):
-                claimed.append(a['id']); save_all(); st.toast(f"Achievement Unlocked: {a['name']}!"); st.rerun()
+                claimed.append(a['id']); save_all(); st.rerun()
         else: st.write(f"Progress: {a['curr']} / {a['target']}")
         st.divider()

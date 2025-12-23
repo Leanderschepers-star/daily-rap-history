@@ -100,30 +100,43 @@ inventory = purchases + [a['item'] for a in achievements if a['id'] in claimed a
 st.set_page_config(page_title="Studio Journal", page_icon="🎤", layout="wide")
 
 with st.sidebar:
-    # Artist Profile Emoji
+    # Artist Profile Emoji logic
     profile_emoji = "👤"
     if "Rookie Cap 🧢" in inventory: profile_emoji = "🧢"
     if "Silver Chain ⛓️" in inventory: profile_emoji = "💎"
 
-    st.title(f"{profile_emoji} Dashboard")
-    st.metric("Wallet", f"{user_points} RC")
-    st.metric("Streak", f"🔥 {current_streak} Days")
+    st.title(f"{profile_emoji} Studio Control")
+    
+    # Primary Stats
+    col1, col2 = st.columns(2)
+    col1.metric("Wallet", f"{user_points} RC")
+    col2.metric("Streak", f"🔥 {current_streak} Days")
     
     st.divider()
+    
+    # Studio Progress
     st.write(f"📈 **Studio Level: {studio_level}**")
     st.progress(min(total_words / 2500, 1.0))
-    st.caption(f"Role: {level_name}")
-    st.write(f"Total Words: `{total_words}`")
+    st.caption(f"Role: {level_name} ({total_words}/2500 words)")
     
     st.divider()
+    
+    # Display Manager (Inventory)
     st.subheader("📦 Display Manager")
+    st.caption("Toggle items to decorate your studio:")
     show_items = {}
-    for item in inventory:
-        show_items[item] = st.checkbox(f"Show {item}", value=True)
+    if not inventory:
+        st.write("No items yet. Visit the Shop!")
+    else:
+        for item in inventory:
+            show_items[item] = st.checkbox(f"Show {item}", value=True)
     
     st.divider()
+    
+    # Navigation
     st.link_button("🔙 Main App", MAIN_APP_URL, use_container_width=True)
-
+    if st.button("🔄 Refresh Studio", use_container_width=True):
+        st.rerun()
 # --- 5. STUDIO SCREEN ---
 st.title("🎤 My Studio")
 

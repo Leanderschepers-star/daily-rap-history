@@ -41,6 +41,9 @@ claimed = list(set(re.findall(r'CLAIMED: (.*)', full_text)))
 tasks_done = list(set(re.findall(r'TASK_DONE: (.*)', full_text)))
 active_theme = re.search(r'ACTIVE_THEME: (.*)', full_text).group(1) if "ACTIVE_THEME:" in full_text else "Default Dark"
 
+# Parse Active Gear (New logic for toggling)
+enabled_gear = re.findall(r'ENABLED_GEAR: (.*)', full_text)
+
 entry_map = {}
 blocks = re.split(r'-{10,}', full_text)
 for b in blocks:
@@ -82,9 +85,11 @@ quest_pool = [
 ]
 daily_tasks = random.sample(quest_pool, 3)
 
-def save_all(theme_to_save=None):
+def save_all(theme_to_save=None, gear_to_save=None):
     t = theme_to_save if theme_to_save else active_theme
+    g_list = gear_to_save if gear_to_save is not None else enabled_gear
     content = f"ACTIVE_THEME: {t}\n"
+    for g in g_list: content += f"ENABLED_GEAR: {g}\n"
     for p in sorted(purchases): content += f"PURCHASE: {p}\n"
     for c in sorted(claimed): content += f"CLAIMED: {c}\n"
     for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
@@ -100,61 +105,60 @@ themes = {
     "Blue Booth UI 🟦": "background: radial-gradient(circle, #001a33 0%, #0f0f0f 100%);"
 }
 
-# GEAR EFFECTS
-foam_border = "border: 6px double #444; padding: 15px; background: #0a0a0a !important; border-radius: 12px;" if "Acoustic Foam 🔇" in purchases else ""
-led_glow = "box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);" if "LED Strips 🌈" in purchases else ""
+# Apply Visual Toggles
+foam_active = "Acoustic Foam 🎚️" in enabled_gear
+led_active = "LED Strips 🌈" in enabled_gear
+
+foam_css = "border: 6px double #444; padding: 15px; background: #0a0a0a !important; border-radius: 12px;" if foam_active else ""
+led_css = "box-shadow: 0 0 25px rgba(0, 255, 136, 0.6);" if led_active else ""
 
 st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
 <style>
     .stApp {{ {themes.get(active_theme, themes['Default Dark'])} color: white; }}
-    .stats-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; {led_glow} }}
+    .stats-card {{ background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; {led_css} }}
     .quest-item {{ padding: 10px; border-radius: 8px; margin-bottom: 5px; border-left: 5px solid #444; background: rgba(255,255,255,0.02); }}
-    .ready {{ border-left-color: #ffaa00; background: rgba(255, 170, 0, 0.1); }}
     .done {{ border-left-color: #00ff88; background: rgba(0, 255, 136, 0.1); color: #00ff88; }}
-    .inventory-box {{ background: rgba(255,255,255,0.1); padding: 10px; border-radius: 10px; border: 1px dashed #555; margin: 5px; text-align: center; font-size: 0.8em; }}
-    
-    /* Center Reveal Animation */
-    .reveal-box {{ 
-        text-align: center; 
-        padding: 40px; 
-        background: rgba(0,0,0,0.9); 
-        border: 2px solid #ffaa00; 
-        border-radius: 20px;
-        margin: 20px auto;
-        max-width: 500px;
-    }}
-    
-    /* Fixed Foam Styling */
-    div[data-baseweb="textarea"] {{ {foam_border} }}
+    div[data-baseweb="textarea"] {{ {foam_css} }}
+    .reveal-box {{ text-align: center; padding: 40px; background: rgba(0,0,0,0.9); border: 2px solid #ffaa00; border-radius: 20px; margin: 20px auto; max-width: 500px; }}
 </style>
 """, unsafe_allow_html=True)
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("🕹️ Studio Control")
-    st.metric("Wallet Balance", f"{user_points} RC")
-    st.divider()
-    st.subheader("🔗 External Links")
-    st.markdown("[🎤 Open Daily Bars & Prompts](https://daily-rap-app-woyet5jhwynnn9fbrjuvct.streamlit.app)")
+    st.metric("Wallet", f"{user_points} RC")
     
     st.divider()
-    st.subheader("🎨 Studio Theme")
+    st.subheader("🎨 Studio Appearance")
+    # Theme Select
     unlocked_themes = ["Default Dark"]
     if "day1" in claimed: unlocked_themes.append("Underground UI 🧱")
-    if "words_500" in unlocked_themes: unlocked_themes.append("Classic Studio 🎙️")
-    if "week" in unlocked_themes: unlocked_themes.append("Blue Booth UI 🟦")
+    if "words_500" in claimed: unlocked_themes.append("Classic Studio 🎙️")
+    if "week" in claimed: unlocked_themes.append("Blue Booth UI 🟦")
     
-    selected_theme = st.selectbox("Switch Look", unlocked_themes, index=unlocked_themes.index(active_theme) if active_theme in unlocked_themes else 0)
+    selected_theme = st.selectbox("Current Theme", unlocked_themes, index=unlocked_themes.index(active_theme) if active_theme in unlocked_themes else 0)
     if selected_theme != active_theme:
         save_all(theme_to_save=selected_theme)
+        st.rerun()
+
+    # Gear Toggles
+    st.write("---")
+    st.write("🛠️ **Installed Gear**")
+    gear_owned = [g for g in ["Acoustic Foam 🎚️", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"] if g in purchases or g.replace("🎚️", "🔇") in purchases]
+    
+    new_enabled_gear = []
+    for g in gear_owned:
+        if st.checkbox(g, value=(g in enabled_gear)):
+            new_enabled_gear.append(g)
+    
+    if set(new_enabled_gear) != set(enabled_gear):
+        save_all(gear_to_save=new_enabled_gear)
         st.rerun()
 
     st.divider()
     st.subheader("📋 Daily Quests")
     tasks_claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
-    gear_pool = ["Acoustic Foam 🔇", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
-    
     q_count = len(tasks_claimed_today)
     st.progress(q_count / 3)
     
@@ -165,54 +169,63 @@ with st.sidebar:
         elif t['req']:
             if st.button(f"Claim {t['rc']} RC", key=f"btn_{t['id']}"):
                 tasks_done.append(t_key); save_all(); st.rerun()
-        else: st.markdown(f"<div class='quest-item'>⚪ {t['desc']}</div>", unsafe_allow_html=True)
 
-# --- 7. MAIN UI & REVEAL ---
+    # Debug Tester (Bottom of Sidebar)
+    st.write("---")
+    if st.button("🛠️ Test Chest Animation"):
+        st.session_state["test_trigger"] = True
+
+# --- 7. MAIN UI ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
 
 # THE CENTER REVEAL LOGIC
-if q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x):
-    reveal_area = st.empty()
-    if reveal_area.button("🎁 OPEN DAILY CHEST", use_container_width=True, type="primary"):
+gear_pool = ["Acoustic Foam 🎚️", "LED Strips 🌈", "Gold XLR Cable 🔌", "Pop Filter 🎙️", "Studio Monitor Stands 🔊"]
+reveal_area = st.empty()
+
+# Trigger for Actual Chest or Test
+show_test = st.session_state.get("test_trigger", False)
+show_real = (q_count == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x))
+
+if show_real or show_test:
+    if reveal_area.button("🎁 OPEN CHEST" if show_real else "🧪 RUN TEST REVEAL", use_container_width=True, type="primary"):
         for msg in ["🎵 RECORDING LOOT...", "🎧 MIXING REWARDS...", "🎤 FINAL MASTERING..."]:
             reveal_area.markdown(f"<div class='reveal-box'><h2>{msg}</h2></div>", unsafe_allow_html=True)
-            time.sleep(0.8)
+            time.sleep(0.7)
         
-        st.snow() # Snow is more "chill/musical" than balloons for a studio vibe
-        tasks_done.append(f"{today_str}_COMPLETION_RC200")
-        new_gear = next((g for g in gear_pool if g not in purchases), None)
-        
-        if new_gear:
-            purchases.append(new_gear)
-            reveal_area.markdown(f"<div class='reveal-box'><h1>🎸 NEW GEAR!</h1><h3>{new_gear}</h3><p>+200 RC added to wallet</p></div>", unsafe_allow_html=True)
+        st.snow()
+        if show_real:
+            tasks_done.append(f"{today_str}_COMPLETION_RC200")
+            new_gear = next((g for g in gear_pool if g not in purchases), None)
+            if new_gear:
+                purchases.append(new_gear)
+                reveal_area.markdown(f"<div class='reveal-box'><h1>🎸 NEW GEAR!</h1><h3>{new_gear}</h3></div>", unsafe_allow_html=True)
+            else:
+                reveal_area.markdown(f"<div class='reveal-box'><h1>💰 +200 RC</h1></div>", unsafe_allow_html=True)
+            save_all()
         else:
-            reveal_area.markdown(f"<div class='reveal-box'><h1>💰 PAYDAY!</h1><h3>+200 RC</h3></div>", unsafe_allow_html=True)
-        
-        save_all()
-        time.sleep(4)
+            reveal_area.markdown(f"<div class='reveal-box'><h1>✨ TEST SUCCESS</h1><p>Animation working perfectly.</p></div>", unsafe_allow_html=True)
+            st.session_state["test_trigger"] = False
+            
+        time.sleep(3)
         st.rerun()
 
+# Rest of UI (Stats, Tabs)
 c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak} Days</h2></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="stats-card"><h3>Words Today</h3><h2>{today_word_count}</h2></div>', unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak}</h2></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="stats-card"><h3>Words</h3><h2>{today_word_count}</h2></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="stats-card"><h3>Rank</h3><h2>Lv.{len(claimed)+1}</h2></div>', unsafe_allow_html=True)
 
-t_rec, t_vau, t_shop, t_car = st.tabs(["✍️ Record Today", "📂 Timeline", "🏪 Shop", "🏆 Career"])
+t_rec, t_vau, t_shop = st.tabs(["✍️ Record Today", "📂 Vault", "🏪 Studio Shop"])
 
 with t_rec:
-    # Text area now automatically inherits Foam styling from CSS above
-    lyrics = st.text_area(f"Recording Booth: {today_str}", value=entry_map.get(today_str, ""), height=450)
-    if st.button("🚀 Commit Session"):
+    lyrics = st.text_area(f"Booth Session: {today_str}", value=entry_map.get(today_str, ""), height=400)
+    if st.button("🚀 Save Session"):
         entry_map[today_str] = lyrics; save_all(); st.toast("Saved!"); st.rerun()
 
 with t_vau:
-    total_days = (today_date - START_DATE).days
-    for i in range(total_days + 1):
-        target_date = today_date - timedelta(days=i)
-        d_key = target_date.strftime('%d/%m/%Y')
-        if d_key in entry_map:
-            with st.expander(f"🔥 {d_key}"):
-                st.write(entry_map[d_key])
+    for d, lyr in sorted(entry_map.items(), reverse=True):
+        with st.expander(f"📅 {d}"):
+            st.text(lyr)
 
 with t_shop:
     st.session_state["shop_seen"] = True
@@ -222,12 +235,4 @@ with t_shop:
             if item in purchases: st.success(f"OWNED: {item}")
             elif st.button(f"Buy {item} ({price} RC)", key=f"sh_{i}"):
                 if user_points >= price: purchases.append(item); save_all(); st.rerun()
-                else: st.error("Not enough RC!")
-
-with t_car:
-    st.header("Studio Inventory")
-    inv_cols = st.columns(5)
-    for idx, gear in enumerate(gear_pool):
-        with inv_cols[idx]:
-            if gear in purchases: st.markdown(f"<div class='inventory-box'>{gear}</div>", unsafe_allow_html=True)
-            else: st.markdown(f"<div class='inventory-box' style='opacity:0.3;'>🔒 Locked</div>", unsafe_allow_html=True)
+                else: st.error("Low RC!")

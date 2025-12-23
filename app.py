@@ -37,18 +37,54 @@ def update_github_file(content, msg="Update"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA PARSING ---
+# --- 3. DATA PARSING & ADVANCED ECONOMY ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
+# 1. Basic Parsing
 all_blocks = [b.strip() for b in re.split(r'-{3,}', full_text) if b.strip()]
 entries_raw = [b for b in all_blocks if "DATE:" in b and "LYRICS:" in b]
 purchases = [p.strip() for p in re.findall(r'PURCHASE: (.*)', full_text)]
 claimed = [c.strip() for c in re.findall(r'CLAIMED: (.*)', full_text)]
 
-entry_map = {re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e).group(1): e for e in entries_raw if re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)}
-unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys() if datetime.strptime(d, '%d/%m/%Y').date() <= today_date], reverse=True)
+# 2. Date Mapping & Streak
+entry_map = {}
+for e in entries_raw:
+    m = re.search(r'DATE: (\d{2}/\d{2}/\d{4})', e)
+    if m:
+        d_str = m.group(1)
+        if datetime.strptime(d_str, '%d/%m/%Y').date() <= today_date:
+            entry_map[d_str] = e
 
+unique_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
+
+current_streak = 0
+if unique_dates:
+    if (today_date - unique_dates[0]).days <= 1:
+        current_streak = 1
+        for i in range(len(unique_dates)-1):
+            if (unique_dates[i] - unique_dates[i+1]).days == 1: current_streak += 1
+            else: break
+
+# 3. Word Count Calculation
+total_words = 0
+for entry in entries_raw:
+    # We grab everything after 'LYRICS:' to count the words
+    lyric_content = entry.split("LYRICS:")[-1]
+    words = lyric_content.split()
+    total_words += len(words)
+
+# 4. Rewards Math
+# Logic: 10 RC per session + 5 RC per 10 words
+session_rewards = len(unique_dates) * 10
+word_rewards = (total_words // 10) * 5
+
+# Add RC from achievements (defined later in your code, or move the list up)
+# For this to work, ensure the 'achievements' list is defined BEFORE this math
+bonus_points = sum([a['rc'] for a in achievements if a['id'] in claimed])
+spent_points = sum([shop_items.get(p, 0) for p in purchases])
+
+user_points = session_rewards + word_rewards + bonus_points - spent_points
 # STREAK 
 current_streak = 0
 if unique_dates:

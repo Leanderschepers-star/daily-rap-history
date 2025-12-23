@@ -13,7 +13,11 @@ REPO_NAME = "leanderschepers-star/daily-rap-history"
 HISTORY_PATH = "history.txt"
 be_tz = pytz.timezone('Europe/Brussels')
 be_now = datetime.now(be_tz)
-today_str = be_now.strftime('%d/%m/%Y')
+today_date = be_now.date()
+today_str = today_date.strftime('%d/%m/%Y')
+
+# Fixed Start Date
+START_DATE = datetime(2025, 12, 19).date()
 
 def get_github_file(repo, path):
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -48,17 +52,33 @@ for b in blocks:
             d_str = date_match.group(1)
             lyr_match = re.search(r'LYRICS:\s*(.*?)(?=\s*---|$)', b, re.DOTALL)
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
-            if lyr_content: # ONLY add to map if there is actual content
+            if lyr_content:
                 entry_map[d_str] = lyr_content
 
-# --- 3. REBALANCED ECONOMY ---
+# --- 3. REBALANCED ECONOMY & STREAK ---
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
 today_word_count = len(entry_map.get(today_str, "").split())
+
+# Streak Logic: Check backwards from today/yesterday for consecutive non-empty days
+current_streak = 0
+check_date = today_date
+if today_str not in entry_map:
+    check_date = today_date - timedelta(days=1)
+
+while True:
+    d_key = check_date.strftime('%d/%m/%Y')
+    if d_key in entry_map and entry_map[d_key].strip():
+        current_streak += 1
+        check_date -= timedelta(days=1)
+    else:
+        break
+
+# Economy: 1 pt per 2 words + 10 RC per active session + chest bonus
 word_points = total_words // 2
-session_points = len(entry_map) * 10
+active_sessions = len([k for k, v in entry_map.items() if v.strip()])
+session_points = active_sessions * 10
 chest_points = len([x for x in tasks_done if "COMPLETION" in x]) * 200
 
-# Calculate final wallet
 shop_prices = {"Coffee Machine ☕": 150, "Studio Cat 🐈": 400, "Neon 'VIBE' Sign 🏮": 800, "Bass Subwoofer 🔊": 1500, "Smoke Machine 💨": 2500, "Golden Mic 🎤": 5000}
 user_points = word_points + session_points + chest_points
 user_points -= sum([shop_prices.get(p, 0) for p in purchases])
@@ -68,7 +88,7 @@ random.seed(today_str)
 quest_pool = [
     {"id": "q_rec", "desc": "Record today's session", "req": today_str in entry_map, "rc": 50},
     {"id": "q_words", "desc": "Write 100+ words today", "req": today_word_count >= 100, "rc": 100},
-    {"id": "q_vault", "desc": "Review the Vault", "req": "vault_seen" in st.session_state, "rc": 30},
+    {"id": "q_edit", "desc": "Back-fill an empty day", "req": "vault_edited" in st.session_state, "rc": 40},
     {"id": "q_shop", "desc": "Browse Studio Shop", "req": "shop_seen" in st.session_state, "rc": 20}
 ]
 daily_tasks = random.sample(quest_pool, 3)
@@ -79,12 +99,12 @@ def save_all(theme_to_save=None):
     for p in sorted(purchases): content += f"PURCHASE: {p}\n"
     for c in sorted(claimed): content += f"CLAIMED: {c}\n"
     for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
-    # Sort dates to keep history clean
     for d in sorted(entry_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
-        content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{entry_map[d]}\n------------------------------"
+        if entry_map[d].strip():
+            content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{entry_map[d]}\n------------------------------"
     update_github_file(content)
 
-# --- 5. UI STYLING & THEMES ---
+# --- 5. UI STYLING ---
 st.set_page_config(page_title="Leander Studio", layout="wide")
 themes = {
     "Default Dark": "background: #0f0f0f;",
@@ -109,7 +129,6 @@ with st.sidebar:
     st.metric("Wallet Balance", f"{user_points} RC")
     
     st.divider()
-    # Theme Selector (Only shows unlocked ones)
     unlocked_themes = ["Default Dark"]
     if "day1" in claimed: unlocked_themes.append("Underground UI 🧱")
     if "words_500" in claimed: unlocked_themes.append("Classic Studio 🎙️")
@@ -145,36 +164,39 @@ with st.sidebar:
 # --- 7. TABS ---
 st.markdown("<h1 style='text-align:center;'>LEANDER STUDIO</h1>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
-with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{len(entry_map)} Days</h2></div>', unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>{current_streak} Days</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Words Today</h3><h2>{today_word_count}</h2></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="stats-card"><h3>Rank</h3><h2>Lv.{len(claimed)+1}</h2></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="stats-card"><h3>Active Sessions</h3><h2>{active_sessions}</h2></div>', unsafe_allow_html=True)
 
-t_rec, t_vau, t_shop, t_car = st.tabs(["✍️ Record", "📂 Vault", "🏪 Shop", "🏆 Career"])
+t_rec, t_vau, t_shop, t_car = st.tabs(["✍️ Record Today", "📂 Vault (Timeline)", "🏪 Shop", "🏆 Career"])
 
 with t_rec:
     with st.form("booth"):
-        d_input = st.date_input("Date", value=be_now.date())
+        d_input = st.date_input("Date", value=today_date)
         d_key = d_input.strftime('%d/%m/%Y')
         lyrics = st.text_area("Drop your bars...", value=entry_map.get(d_key, ""), height=300)
         if st.form_submit_button("🚀 SAVE TO VAULT"):
-            if lyrics.strip():
-                entry_map[d_key] = lyrics
-                save_all()
-                st.rerun()
-            else:
-                st.warning("Write something before saving!")
+            entry_map[d_key] = lyrics
+            save_all()
+            st.rerun()
 
 with t_vau:
     st.session_state["vault_seen"] = True
-    st.subheader("Your Catalog")
-    # ONLY show days that actually have lyrics
-    vault_dates = sorted(entry_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True)
-    if not vault_dates:
-        st.info("The vault is empty. Record your first session!")
-    else:
-        for d in vault_dates:
-            with st.expander(f"📅 {d} - ({len(entry_map[d].split())} words)"):
-                st.text(entry_map[d])
+    st.subheader("The Timeline: Dec 19 - Today")
+    total_days_range = (today_date - START_DATE).days
+    for i in range(total_days_range + 1):
+        target_date = today_date - timedelta(days=i)
+        d_key = target_date.strftime('%d/%m/%Y')
+        content = entry_map.get(d_key, "")
+        
+        status_color = "🔥" if content.strip() else "❄️"
+        with st.expander(f"{status_color} {d_key} {'(TODAY)' if d_key == today_str else ''}"):
+            edited_lyr = st.text_area(f"Lyrics for {d_key}", value=content, key=f"edit_{d_key}", height=200)
+            if st.button(f"Update {d_key}", key=f"btn_{d_key}"):
+                entry_map[d_key] = edited_lyr
+                st.session_state["vault_edited"] = True
+                save_all()
+                st.rerun()
 
 with t_shop:
     st.session_state["shop_seen"] = True
@@ -194,9 +216,9 @@ with t_shop:
 with t_car:
     st.header("Career Milestones")
     achievements = [
-        {"id": "day1", "name": "First Day", "target": 1, "curr": len(entry_map), "reward": "Underground UI 🧱"},
+        {"id": "day1", "name": "First Day", "target": 1, "curr": active_sessions, "reward": "Underground UI 🧱"},
         {"id": "words_500", "name": "Wordsmith", "target": 500, "curr": total_words, "reward": "Classic Studio 🎙️"},
-        {"id": "week", "name": "Rising Star", "target": 7, "curr": len(entry_map), "reward": "Blue Booth UI 🟦"}
+        {"id": "week", "name": "Rising Star", "target": 7, "curr": current_streak, "reward": "Blue Booth UI 🟦"}
     ]
     for a in achievements:
         prog = min(a['curr'] / a['target'], 1.0)

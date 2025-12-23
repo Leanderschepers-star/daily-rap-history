@@ -1,4 +1,4 @@
-ACTIVE_THEME: Default Dark
+ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: Acoustic Foam 🎚️
 PURCHASE: Acoustic Foam 🔇
 CLAIMED: day1

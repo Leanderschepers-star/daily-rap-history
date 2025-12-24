@@ -10,6 +10,7 @@ TASK_DONE: 23/12/2025_q_streak
 TASK_DONE: 23/12/2025_q_words_RC100
 TASK_DONE: 23/12/2025_t1
 TASK_DONE: 23/12/2025_t3
+TASK_DONE: 24/12/2025_q_rec_RC50
 TASK_DONE: 24/12/2025_q_streak_RC75
 
 ------------------------------

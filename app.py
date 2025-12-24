@@ -123,22 +123,60 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
-# LED Strip Animation CSS
-rainbow_anim = ""
+# ANIMATED LED STRIPS LOGIC
+led_anim_css = ""
 if "LED Strips 🌈" in enabled_gear:
-    rainbow_anim = """
-    @keyframes rainbow { 0% { border-color: #ff0000; } 33% { border-color: #00ff00; } 66% { border-color: #0000ff; } 100% { border-color: #ff0000; } }
-    div[data-baseweb="textarea"] { border: 4px solid red !important; animation: rainbow 3s linear infinite !important; border-radius: 8px; }
+    led_anim_css = """
+    @keyframes rotate { 100% { transform: rotate(1turn); } }
+    
+    /* The Container for the Animated Border */
+    div[data-baseweb="textarea"] {
+        position: relative;
+        z-index: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        padding: 4px; /* Space for the border */
+        background: none !important;
+        border: none !important;
+    }
+
+    div[data-baseweb="textarea"]::before {
+        content: '';
+        position: absolute;
+        z-index: -2;
+        left: -50%;
+        top: -50%;
+        width: 200%;
+        height: 200%;
+        background-color: #1a1a1a;
+        background-repeat: no-repeat;
+        background-size: 50% 50%, 50% 50%;
+        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        background-image: conic-gradient(#ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000);
+        animation: rotate 4s linear infinite;
+    }
+
+    div[data-baseweb="textarea"]::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        left: 4px;
+        top: 4px;
+        width: calc(100% - 8px);
+        height: calc(100% - 8px);
+        background: #0f0f0f;
+        border-radius: 7px;
+    }
     """
 
 st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
 <style>
-    {rainbow_anim}
+    {led_anim_css}
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
-    div[data-baseweb="textarea"] textarea {{ {foam_style} }}
+    div[data-baseweb="textarea"] textarea {{ {foam_style} border: none !important; }}
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
@@ -186,7 +224,6 @@ with st.sidebar:
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
     if sel_theme != active_theme: save_all(theme_to_save=sel_theme); st.rerun()
     
-    # NEW: GEAR TOGGLE SECTION
     st.write("**Toggle Gear**")
     new_gear_list = []
     for g in gear_items.keys():

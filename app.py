@@ -123,49 +123,27 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
+# SPECIAL UNLOCK: NEON GLOW PULSE
+neon_pulse = ""
+if "Neon Rack Glow 🟣" in enabled_gear:
+    neon_pulse = "@keyframes neon { 0% { box-shadow: 0 0 5px #bc13fe; } 50% { box-shadow: 0 0 20px #bc13fe; } 100% { box-shadow: 0 0 5px #bc13fe; } } section[data-testid='stSidebar'] { animation: neon 2s infinite ease-in-out; }"
+
 # ANIMATED LED STRIPS LOGIC
 led_anim_css = ""
 if "LED Strips 🌈" in enabled_gear:
     led_anim_css = """
     @keyframes rotate { 100% { transform: rotate(1turn); } }
-    
-    /* The Container for the Animated Border */
     div[data-baseweb="textarea"] {
-        position: relative;
-        z-index: 0;
-        border-radius: 10px;
-        overflow: hidden;
-        padding: 4px; /* Space for the border */
-        background: none !important;
-        border: none !important;
+        position: relative; z-index: 0; border-radius: 10px; overflow: hidden; padding: 4px; background: none !important; border: none !important;
     }
-
     div[data-baseweb="textarea"]::before {
-        content: '';
-        position: absolute;
-        z-index: -2;
-        left: -50%;
-        top: -50%;
-        width: 200%;
-        height: 200%;
-        background-color: #1a1a1a;
-        background-repeat: no-repeat;
-        background-size: 50% 50%, 50% 50%;
-        background-position: 0 0, 100% 0, 100% 100%, 0 100%;
+        content: ''; position: absolute; z-index: -2; left: -50%; top: -50%; width: 200%; height: 200%;
         background-image: conic-gradient(#ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000);
         animation: rotate 4s linear infinite;
     }
-
     div[data-baseweb="textarea"]::after {
-        content: '';
-        position: absolute;
-        z-index: -1;
-        left: 4px;
-        top: 4px;
-        width: calc(100% - 8px);
-        height: calc(100% - 8px);
-        background: #0f0f0f;
-        border-radius: 7px;
+        content: ''; position: absolute; z-index: -1; left: 4px; top: 4px; width: calc(100% - 8px); height: calc(100% - 8px);
+        background: #0f0f0f; border-radius: 7px;
     }
     """
 
@@ -173,6 +151,7 @@ st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
 <style>
     {led_anim_css}
+    {neon_pulse}
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
@@ -217,19 +196,26 @@ with st.sidebar:
         else: st.info(f"⚪ {t['desc']}")
 
     st.divider(); st.subheader("⚙️ SETTINGS")
+    # CAREER THEME UNLOCKS
     unlocked_t = ["Default Dark"]
-    if "streak_3" in claimed: unlocked_t.append("Classic Studio 🎙️")
+    if "day1" in claimed: unlocked_t.append("Classic Studio 🎙️")
     if "words_500" in claimed: unlocked_t.append("Golden Era 🪙")
     if "streak_14" in claimed: unlocked_t.append("Midnight Diamond 💎")
+    
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
     if sel_theme != active_theme: save_all(theme_to_save=sel_theme); st.rerun()
     
     st.write("**Toggle Gear**")
     new_gear_list = []
-    for g in gear_items.keys():
-        if g in purchases:
+    # Combined list of Shop Gear + Career Exclusive Gear
+    available_gear = list(gear_items.keys()) + ["Neon Rack Glow 🟣"]
+    for g in available_gear:
+        # Check if bought OR if career milestone reached
+        is_unlocked = (g in purchases) or (g == "Neon Rack Glow 🟣" and "streak_3" in claimed) or (g == "Mastering Console 🎛️" and "words_2000" in claimed)
+        if is_unlocked:
             if st.checkbox(g, value=(g in enabled_gear), key=f"chk_{g}"):
                 new_gear_list.append(g)
+                
     if sorted(new_gear_list) != sorted(enabled_gear):
         save_all(gear_to_save=new_gear_list); st.rerun()
 
@@ -310,13 +296,17 @@ with t_shop:
 
 with t_car:
     achs = [
-        {"id": "day1", "name": "Intern", "goal": "1 Session", "target": 1, "curr": active_sessions},
-        {"id": "streak_3", "name": "Rookie", "goal": "3 Day Streak", "target": 3, "curr": current_streak},
-        {"id": "words_500", "name": "Writer", "goal": "500 Words", "target": 500, "curr": total_words},
+        {"id": "day1", "name": "Intern", "goal": "1 Session", "reward": "Ambience: Classic Studio 🎙️", "target": 1, "curr": active_sessions},
+        {"id": "streak_3", "name": "Rookie", "goal": "3 Day Streak", "reward": "Gear: Neon Rack Glow 🟣", "target": 3, "curr": current_streak},
+        {"id": "words_500", "name": "Writer", "goal": "500 Words", "reward": "Ambience: Golden Era 🪙", "target": 500, "curr": total_words},
+        {"id": "words_2000", "name": "Artist", "goal": "2000 Words", "reward": "Gear: Mastering Console 🛛️", "target": 2000, "curr": total_words},
     ]
     for a in achs:
         st.subheader(f"{a['name']} ({a['goal']})")
+        st.write(f"🎁 Reward: **{a['reward']}**")
         st.progress(min(a['curr'] / a['target'], 1.0))
         if a['id'] not in claimed and a['curr'] >= a['target']:
             if st.button(f"Claim Achievement", key=f"ach_{a['id']}"):
                 claimed.append(a['id']); save_all(); st.rerun()
+        elif a['id'] in claimed:
+            st.success("Claimed & Unlocked!")

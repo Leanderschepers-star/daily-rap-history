@@ -123,9 +123,18 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
+# LED Strip Animation CSS
+rainbow_anim = ""
+if "LED Strips 🌈" in enabled_gear:
+    rainbow_anim = """
+    @keyframes rainbow { 0% { border-color: #ff0000; } 33% { border-color: #00ff00; } 66% { border-color: #0000ff; } 100% { border-color: #ff0000; } }
+    div[data-baseweb="textarea"] { border: 4px solid red !important; animation: rainbow 3s linear infinite !important; border-radius: 8px; }
+    """
+
 st.set_page_config(page_title="Leander Studio", layout="wide")
 st.markdown(f"""
 <style>
+    {rainbow_anim}
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
@@ -133,7 +142,6 @@ st.markdown(f"""
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
-    /* Reward Overlay Animation */
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
     @keyframes shine {{ 0% {{ background-position: -200%; }} 100% {{ background-position: 200%; }} }}
     
@@ -178,6 +186,16 @@ with st.sidebar:
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
     if sel_theme != active_theme: save_all(theme_to_save=sel_theme); st.rerun()
     
+    # NEW: GEAR TOGGLE SECTION
+    st.write("**Toggle Gear**")
+    new_gear_list = []
+    for g in gear_items.keys():
+        if g in purchases:
+            if st.checkbox(g, value=(g in enabled_gear), key=f"chk_{g}"):
+                new_gear_list.append(g)
+    if sorted(new_gear_list) != sorted(enabled_gear):
+        save_all(gear_to_save=new_gear_list); st.rerun()
+
     st.divider()
     if st.button("🎁 TEST CHEST ANIMATION", use_container_width=True):
         st.session_state["test_trigger"] = True
@@ -206,17 +224,14 @@ can_open = (len(claimed_today) == 3 and not any("COMPLETION" in x for x in tasks
 if st.session_state["test_trigger"] or can_open:
     btn_label = "🎁 OPEN SESSION CHEST" if not st.session_state["test_trigger"] else "🎁 TEST CHEST ANIMATION"
     if st.button(btn_label, type="primary", use_container_width=True):
-        # Rolling count simulation
         with st.empty():
             for i in range(0, 260, 20):
                 st.markdown(f"<h2 style='text-align:center; color:gold;'>Crunching Data: {i} RC...</h2>", unsafe_allow_html=True)
                 time.sleep(0.05)
-        
         st.balloons()
         if not st.session_state["test_trigger"]:
             tasks_done.append(f"{today_str}_COMPLETION_RC250")
             save_all()
-        
         st.session_state["test_trigger"] = False
         st.session_state["show_reward"] = True
         st.rerun()
@@ -268,4 +283,3 @@ with t_car:
         if a['id'] not in claimed and a['curr'] >= a['target']:
             if st.button(f"Claim Achievement", key=f"ach_{a['id']}"):
                 claimed.append(a['id']); save_all(); st.rerun()
-            

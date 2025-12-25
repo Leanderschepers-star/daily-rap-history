@@ -176,8 +176,7 @@ if "Wooden Side-Panels 🪵" in purchases: rack_style += "border-right: 10px sol
 if "Solid Gold Frame 🪙" in purchases: rack_style = "background: linear-gradient(180deg, #bf953f, #fcf6ba, #b38728); border-right: 4px solid #aa771c; color: black !important;"
 if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px 30px rgba(185, 242, 255, 0.4);"
 
-foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
-gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
+foam_style = "background-image: radial-gradient(#222 20%, transparent 20%), radial-gradient(#222 20%, transparent 20%) !important; background-color: #111 !important; background-position: 0 0, 10px 10px !important; background-size: 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
 neon_pulse = ""
 if "Neon Rack Glow 🟣" in enabled_gear:

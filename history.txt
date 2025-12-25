@@ -1,10 +1,4 @@
 ACTIVE_THEME: Classic Studio 🎙️
-ENABLED_GEAR: Gold XLR Cable 🔌
-ENABLED_GEAR: Grammy Shelf 🏆
-ENABLED_GEAR: Holographic Display ⚡
-ENABLED_GEAR: Mastering Console 🎛️
-ENABLED_GEAR: Platinum Record 💿
-ENABLED_GEAR: Vintage Tube Mic 🎙️
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈
 CLAIMED: day1

@@ -1,4 +1,5 @@
 ACTIVE_THEME: Classic Studio 🎙️
+ENABLED_GEAR: Gold XLR Cable 🔌
 ENABLED_GEAR: Grammy Shelf 🏆
 ENABLED_GEAR: Holographic Display ⚡
 ENABLED_GEAR: Mastering Console 🎛️

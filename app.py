@@ -205,9 +205,9 @@ st.markdown(f"""
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
+    /* Animations */
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
     @keyframes shine {{ 0% {{ background-position: -200%; }} 100% {{ background-position: 200%; }} }}
-    
     @keyframes shake {
       0% { transform: translate(1px, 1px) rotate(0deg); }
       10% { transform: translate(-1px, -2px) rotate(-1deg); }
@@ -222,13 +222,17 @@ st.markdown(f"""
       100% { transform: translate(1px, -2px) rotate(-1deg); }
     }
 
-    /* 2. Replace your .reward-card class with this one */
+    /* Combined Reward Card: Shakes AND Shines */
     .reward-card {
-        background: #000 !important;
-        padding: 40px; border-radius: 20px; text-align: center;
-        color: white !important; font-weight: bold; width: 350px;
-        animation: shake 0.2s infinite, rewardFade 0.6s ease-out;
+        background: #000 !important; /* Black background for contrast */
+        padding: 40px; 
+        border-radius: 20px; 
+        text-align: center;
+        color: white !important; 
+        font-weight: bold; 
+        width: 350px;
         border: 4px solid white;
+        animation: shake 0.2s infinite, rewardFade 0.6s ease-out;
     }
     
     .reward-overlay {{
@@ -236,13 +240,6 @@ st.markdown(f"""
         background: rgba(0,0,0,0.9); z-index: 9999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         animation: rewardFade 0.6s ease-out;
-    }}
-    .reward-card {{
-        background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728);
-        padding: 40px; border-radius: 20px; text-align: center;
-        box-shadow: 0 0 50px rgba(212, 175, 55, 0.6);
-        color: #000; font-weight: bold; width: 300px;
-        background-size: 200% auto; animation: shine 3s linear infinite;
     }}
 </style>
 """, unsafe_allow_html=True)

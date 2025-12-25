@@ -56,7 +56,50 @@ for b in blocks:
             lyr_match = re.search(r'LYRICS:\s*(.*?)(?=\s*---|$)', b, re.DOTALL)
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
             if lyr_content: entry_map[d_str] = lyr_content
+# --- NEW CALCULATION BLOCK (INSERT THIS HERE) ---
+# 1. Basic Stats
+total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
+today_word_count = len(entry_map.get(today_str, "").split())
+active_sessions = len([k for k, v in entry_map.items() if v.strip()])
 
+# 2. Points & Coins Logic
+# This scans your history for all possible RC rewards (Quests, Chests, Achievements)
+bonus_rc = sum([int(re.search(r'RC(\d+)', x).group(1)) for x in tasks_done if "RC" in x])
+
+# Define Shop Prices so the budget can subtract them
+sidebar_customs = {
+    "Brushed Steel Rack 🏗️": 500, "Wooden Side-Panels 🪵": 800,
+    "Analog VU Meters 📈": 1200, "Neon Rack Glow 🟣": 2000,
+    "Solid Gold Frame 🪙": 5000, "Diamond Studded Trim 💎": 10000
+}
+gear_items = {
+    "Acoustic Foam 🎚️": 150, "LED Strips 🌈": 400, "Gold XLR Cable 🔌": 800,
+    "Vintage Tube Mic 🎙️": 2500, "Mastering Console 🎛️": 6000, "Holographic Display ⚡": 15000
+}
+all_shop = {**sidebar_customs, **gear_items}
+
+user_points = (total_words // 2) + (active_sessions * 10) + bonus_rc - sum([all_shop.get(p, 0) for p in purchases if p in all_shop])
+
+# 3. Streak Logic
+current_streak = 0
+check_date = today_date
+if today_str not in entry_map: check_date = today_date - timedelta(days=1)
+while True:
+    d_key = check_date.strftime('%d/%m/%Y')
+    if d_key in entry_map and entry_map[d_key].strip():
+        current_streak += 1
+        check_date -= timedelta(days=1)
+    else: break
+
+# 4. Daily Quests
+random.seed(today_str)
+dynamic_goal = random.choice([50, 100, 150, 250])
+daily_tasks = [
+    {"id": "q_rec", "desc": "Record today's session", "req": today_str in entry_map, "rc": 50},
+    {"id": "q_words", "desc": f"Write {dynamic_goal} words", "req": today_word_count >= dynamic_goal, "rc": 100},
+    {"id": "q_streak", "desc": "Maintain streak (1+)", "req": current_streak >= 1, "rc": 75}
+]
+# ------------------------------------------------
 # --- 3. DEFINITIONS & RARITY ENGINE ---
 RARITIES = {
     "COMMON": {"color": "#9da5b4", "chance": 0.60, "rc_range": (50, 150)},

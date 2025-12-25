@@ -170,13 +170,16 @@ themes_css = {
     "Midnight Reflection 🌧️": "background: radial-gradient(circle, #0a0e14 0%, #000000 100%); color: #b9f2ff;"
 }
 
-# 1. Prefix Effects (Loot Box Gear)
+# 1. Prefix Effects Logic (Keep this OUTSIDE the st.markdown string)
 prefix_css = ""
-if any("Toxic" in g for g in enabled_gear): prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
-if any("Frozen" in g for g in enabled_gear): prefix_css += "background: rgba(173, 216, 230, 0.2) !important; border: 1px solid #00f2ff !important;"
-if any("Electric" in g for g in enabled_gear): prefix_css += "border-left: 5px solid #f1c40f !important; border-right: 5px solid #f1c40f !important;"
-if any("Ghost" in g for g in enabled_gear): prefix_css += "opacity: 0.7; filter: blur(0.5px);"
-if any("Chrome" in g for g in enabled_gear): prefix_css += "background: linear-gradient(145deg, #777, #fff, #777) !important; color: black !important;"
+if any("Toxic" in g for g in enabled_gear): 
+    prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
+if any("Frozen" in g for g in enabled_gear): 
+    prefix_css += "background-color: rgba(0, 242, 255, 0.15) !important; border: 1px solid #00f2ff !important;"
+if any("Electric" in g for g in enabled_gear): 
+    prefix_css += "border-left: 5px solid #f1c40f !important; border-right: 5px solid #f1c40f !important;"
+if any("Chrome" in g for g in enabled_gear): 
+    prefix_css += "background-color: rgba(255, 255, 255, 0.1) !important; box-shadow: inset 0 0 20px white; color: black !important;"
 
 # 2. Sidebar Rack Styles
 rack_style = "background: #111; border-right: 1px solid #333;"
@@ -185,11 +188,9 @@ if "Wooden Side-Panels 🪵" in purchases: rack_style += "border-right: 10px sol
 if "Solid Gold Frame 🪙" in purchases: rack_style = "background: linear-gradient(180deg, #bf953f, #fcf6ba, #b38728); border-right: 4px solid #aa771c; color: black !important;"
 if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px 30px rgba(185, 242, 255, 0.4);"
 
-# 3. Specific Gear Styles
-# Enhanced Acoustic Foam (3D texture)
+# 3. Acoustic Foam Style
 foam_style = ""
 if "Acoustic Foam 🎚️" in enabled_gear:
-    # High-contrast 3D Studded Pattern
     foam_style = """
     background-color: #111 !important;
     background-image: 
@@ -197,9 +198,8 @@ if "Acoustic Foam 🎚️" in enabled_gear:
         radial-gradient(circle at 12px 12px, #000 1px, transparent 0),
         repeating-conic-gradient(#1a1a1a 0% 25%, #111 25% 50%) !important;
     background-size: 20px 20px !important;
-    color: #00ff00 !important;
-    border: 2px solid #444 !important;
     """
+
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
 neon_pulse = ""
@@ -226,35 +226,19 @@ st.markdown(f"""
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
     
-    /* THE BOOTH INTERIOR */
+    /* THE BOOTH INTERIOR (Text Area) */
     div[data-baseweb="textarea"] textarea {{ 
-        {foam_style} 
-        prefix_css = ""
-if any("Toxic" in g for g in enabled_gear): 
-    prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
-if any("Frozen" in g for g in enabled_gear): 
-    # Use rgba so it's a semi-transparent blue tint over the foam
-    prefix_css += "background-color: rgba(0, 242, 255, 0.15) !important; border: 1px solid #00f2ff !important;"
-if any("Chrome" in g for g in enabled_gear): 
-    # Semi-transparent silver sheen
-    prefix_css += "background-color: rgba(255, 255, 255, 0.1) !important; box-shadow: inset 0 0 20px white;"
-        border: none !important; 
-    }}
-    
-    /* Helper to ensure transparency for LED strips */
-   /* THE BOOTH INTERIOR */
-    div[data-baseweb="textarea"] textarea { 
         {foam_style} 
         {prefix_css} 
         background-attachment: local !important;
         border: none !important; 
-    }
+    }}
 
-    /* Force the background to show through Streamlit's default layers */
-    div[data-baseweb="textarea"] {
+    /* Essential for LED Strips and Foam visibility */
+    div[data-baseweb="textarea"] {{
         background: transparent !important;
         border: none !important;
-    }
+    }}
     
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
@@ -262,15 +246,6 @@ if any("Chrome" in g for g in enabled_gear):
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
     @keyframes shake {{
       0% {{ transform: translate(1px, 1px) rotate(0deg); }}
-      10% {{ transform: translate(-1px, -2px) rotate(-1deg); }}
-      20% {{ transform: translate(-3px, 0px) rotate(1deg); }}
-      30% {{ transform: translate(3px, 2px) rotate(0deg); }}
-      40% {{ transform: translate(1px, -1px) rotate(1deg); }}
-      50% {{ transform: translate(-1px, 2px) rotate(-1deg); }}
-      60% {{ transform: translate(-3px, 1px) rotate(0deg); }}
-      70% {{ transform: translate(3px, 1px) rotate(-1deg); }}
-      80% {{ transform: translate(-1px, -1px) rotate(1deg); }}
-      90% {{ transform: translate(1px, 2px) rotate(0deg); }}
       100% {{ transform: translate(1px, -2px) rotate(-1deg); }}
     }}
 
@@ -290,73 +265,6 @@ if any("Chrome" in g for g in enabled_gear):
     }}
 </style>
 """, unsafe_allow_html=True)
-# --- 7. SIDEBAR UI (NOW SAFE TO RUN) ---
-with st.sidebar:
-    st.title("🎚️ STUDIO RACK")
-    
-    if any(x in purchases for x in ["Analog VU Meters 📈", "Obsidian VU Meters 🌑"]):
-        st.write("Input Levels")
-        st.markdown('<div class="vu-meter"></div>', unsafe_allow_html=True)
-    
-    st.metric("Budget", f"{user_points} RC")
-    
-    with st.expander("💎 Rarity Guide"):
-        for r, d in RARITIES.items():
-            st.markdown(f"<span style='color:{d['color']}'>● {r}</span>", unsafe_allow_html=True)
-
-    st.divider()
-    st.subheader("📋 QUEST LOG")
-    claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
-    st.progress(len(claimed_today) / 3)
-    for t in daily_tasks:
-        if any(t['id'] in x for x in tasks_done if today_str in x):
-            st.success(f"✅ {t['desc']}")
-        elif t['req']:
-            if st.button(f"Claim {t['rc']} RC", key=f"q_{t['id']}"):
-                tasks_done.append(f"{today_str}_{t['id']}_RC{t['rc']}")
-                save_all()
-                st.rerun()
-        else:
-            st.info(f"⚪ {t['desc']}")
-
-    st.divider()
-    st.subheader("⚙️ SETTINGS")
-    
-    # Unlock Themes based on Milestones
-    unlocked_t = ["Default Dark"]
-    if any("mil_" in c and int(c.split('_')[1]) >= 1 for c in claimed): unlocked_t.append("Classic Studio 🎙️")
-    if any("mil_" in c and int(c.split('_')[1]) >= 5 for c in claimed): unlocked_t.append("Golden Era 🪙")
-    if any("mil_" in c and int(c.split('_')[1]) >= 20 for c in claimed): unlocked_t.append("Midnight Reflection 🌧️")
-    
-    sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
-    
-    # THIS CAUSED YOUR ERROR: now it's safe because save_all is defined above
-    if sel_theme != active_theme:
-        save_all(theme_to_save=sel_theme)
-        st.rerun()
-    
-    st.write("**Toggle Gear & Collection**")
-    new_gear_list = []
-    
-    # Combine Shop Gear + All Loot Drops
-    standard_gear = list(gear_items.keys()) + ["Neon Rack Glow 🟣"]
-    all_unlocked_gear = list(set(standard_gear + [p for p in purchases if "(" in p or "🎨" in p or any(word in p for word in COSMETIC_NOUNS)]))
-    
-    for g in sorted(all_unlocked_gear):
-        is_owned = (g in purchases) or (g in claimed) or (g == "Neon Rack Glow 🟣" and any("mil_" in c and int(c.split('_')[1]) >= 3 for c in claimed))
-        
-        if is_owned:
-            if st.checkbox(g, value=(g in enabled_gear), key=f"chk_{g}"):
-                new_gear_list.append(g)
-                
-    if sorted(new_gear_list) != sorted(enabled_gear):
-        save_all(gear_to_save=new_gear_list)
-        st.rerun()
-
-    st.divider()
-    if st.button("🎁 TEST LEGENDARY DROP", use_container_width=True):
-        st.session_state["show_reward"] = {"name": "Obsidian Mic (LEGENDARY)", "rarity": "LEGENDARY", "type": "COSMETIC"}
-        st.rerun()
 
 # --- 8. REWARD OVERLAY & CHEST ---
 if st.session_state["show_reward"]:

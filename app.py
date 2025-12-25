@@ -289,21 +289,6 @@ if isinstance(st.session_state.get("show_reward"), dict):
     st.session_state["show_reward"] = False
     st.rerun()
 
-# 3. Chest Logic
-can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
-
-if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
-    st.balloons()
-    result = roll_loot_box()
-    if result['type'] == "COSMETIC":
-        purchases.append(result['name'])
-    else:
-        tasks_done.append(f"{today_str}_CHEST_RC{result['val']}")
-    
-    st.session_state["show_reward"] = result
-    save_all()
-    st.rerun()
-
 # --- 8. REWARD OVERLAY & CHEST ---
 if st.session_state["show_reward"]:
     reward = st.session_state["show_reward"]

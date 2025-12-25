@@ -220,7 +220,7 @@ st.markdown(f"""
       80% { transform: translate(-1px, -1px) rotate(1deg); }
       90% { transform: translate(1px, 2px) rotate(0deg); }
       100% { transform: translate(1px, -2px) rotate(-1deg); }
-    }
+    }}
 
     /* Combined Reward Card: Shakes AND Shines */
     .reward-card {

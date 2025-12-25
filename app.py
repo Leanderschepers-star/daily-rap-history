@@ -193,8 +193,8 @@ st.markdown(f"""
 
     /* TARGET THE ACTUAL TEXT AREA INTERIOR */
     div[data-baseweb="textarea"] textarea {{ 
-        {foam_style} 
-        {prefix_css} 
+        {{foam_style}} 
+        {{prefix_css}} 
     }}
 
     /* FIX: Ensure the container doesn't block the background */

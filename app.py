@@ -162,7 +162,7 @@ for i in range(1, 501):
         "reward": "Mystery Loot Box"
     })
 
-# --- 6. VISUAL CSS ---
+# --- 6. VISUAL CSS & STYLE ENGINE ---
 themes_css = {
     "Default Dark": "background: #0f0f0f;",
     "Classic Studio 🎙️": "background-color: #1a1e23; background-image: linear-gradient(0deg, #23282e 1px, transparent 1px), linear-gradient(90deg, #23282e 1px, transparent 1px); background-size: 40px 40px; color: #d1d8e0;",
@@ -170,7 +170,7 @@ themes_css = {
     "Midnight Reflection 🌧️": "background: radial-gradient(circle, #0a0e14 0%, #000000 100%); color: #b9f2ff;"
 }
 
-# --- STYLE ENGINE: Effects for Loot Box Gear ---
+# 1. Prefix Effects (Loot Box Gear)
 prefix_css = ""
 if any("Toxic" in g for g in enabled_gear): prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
 if any("Frozen" in g for g in enabled_gear): prefix_css += "background: rgba(173, 216, 230, 0.2) !important; border: 1px solid #00f2ff !important;"
@@ -178,33 +178,19 @@ if any("Electric" in g for g in enabled_gear): prefix_css += "border-left: 5px s
 if any("Ghost" in g for g in enabled_gear): prefix_css += "opacity: 0.7; filter: blur(0.5px);"
 if any("Chrome" in g for g in enabled_gear): prefix_css += "background: linear-gradient(145deg, #777, #fff, #777) !important; color: black !important;"
 
+# 2. Sidebar Rack Styles
 rack_style = "background: #111; border-right: 1px solid #333;"
 if "Brushed Steel Rack 🏗️" in purchases: rack_style = "background: linear-gradient(180deg, #2c3e50, #000); border-right: 2px solid #95a5a6;"
 if "Wooden Side-Panels 🪵" in purchases: rack_style += "border-right: 10px solid #5d4037;"
 if "Solid Gold Frame 🪙" in purchases: rack_style = "background: linear-gradient(180deg, #bf953f, #fcf6ba, #b38728); border-right: 4px solid #aa771c; color: black !important;"
 if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px 30px rgba(185, 242, 255, 0.4);"
 
-st.markdown(f"""
-<style>
-    {{led_anim_css}}
-    {{neon_pulse}}
-    .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
-    section[data-testid="stSidebar"] {{ {rack_style} }}
+# 3. Specific Gear Styles
+# Enhanced Acoustic Foam (3D texture)
+foam_style = ""
+if "Acoustic Foam 🎚️" in enabled_gear:
+    foam_style = "background-color: #111 !important; background-image: radial-gradient(#000 15%, transparent 16%), radial-gradient(#333 15%, transparent 16%) !important; background-position: 0 0, 1px 1px !important; background-size: 15px 15px !important; color: #fff !important;"
 
-    /* TARGET THE ACTUAL TEXT AREA INTERIOR */
-    div[data-baseweb="textarea"] textarea {{ 
-        {{foam_style}} 
-        {{prefix_css}} 
-    }}
-
-    /* FIX: Ensure the container doesn't block the background */
-    div[data-baseweb="textarea"] {{
-        background: transparent !important;
-    }}
-
-    button[kind="primary"] {{ {{gold_style}} }}
-</style>
-""", unsafe_allow_html=True)
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
 neon_pulse = ""
@@ -220,7 +206,9 @@ if "LED Strips 🌈" in enabled_gear:
     div[data-baseweb="textarea"]::after { content: ''; position: absolute; z-index: -1; left: 4px; top: 4px; width: calc(100% - 8px); height: calc(100% - 8px); background: #0f0f0f; border-radius: 7px; }
     """
 
+# --- 7. APPLY STYLES & PAGE CONFIG ---
 st.set_page_config(page_title="Leander Studio", layout="wide")
+
 st.markdown(f"""
 <style>
     {led_anim_css}
@@ -229,16 +217,17 @@ st.markdown(f"""
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
     
-    /* Corrected: Single braces here to inject the variables */
+    /* THE BOOTH INTERIOR */
     div[data-baseweb="textarea"] textarea {{ 
         {foam_style} 
         {prefix_css} 
         border: none !important; 
     }}
     
-    /* Corrected: Single braces for gold_style */
+    /* Helper to ensure transparency for LED strips */
+    div[data-baseweb="textarea"] {{ background: transparent !important; }}
+    
     button[kind="primary"] {{ {gold_style} }}
-
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
@@ -258,12 +247,8 @@ st.markdown(f"""
 
     .reward-card {{
         background: #000 !important;
-        padding: 40px; 
-        border-radius: 20px; 
-        text-align: center;
-        color: white !important; 
-        font-weight: bold; 
-        width: 350px;
+        padding: 40px; border-radius: 20px; text-align: center;
+        color: white !important; font-weight: bold; width: 350px;
         border: 4px solid white;
         animation: shake 0.2s infinite, rewardFade 0.6s ease-out;
     }}
@@ -276,9 +261,6 @@ st.markdown(f"""
     }}
 </style>
 """, unsafe_allow_html=True)
-</style>
-""", unsafe_allow_html=True)
-
 # --- 7. SIDEBAR UI (NOW SAFE TO RUN) ---
 with st.sidebar:
     st.title("🎚️ STUDIO RACK")
@@ -378,7 +360,7 @@ if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not 
     save_all()
     st.rerun()
 
-# --- 9. MAIN APP TABS ---
+# --- 9. MAIN APP TABS --- 
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Session Words</h3><h2>📝 {today_word_count}</h2></div>', unsafe_allow_html=True)

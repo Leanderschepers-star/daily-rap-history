@@ -222,7 +222,6 @@ st.markdown(f"""
       100% {{ transform: translate(1px, -2px) rotate(-1deg); }}
     }}
 
-    /* Combined Reward Card: Shakes AND Shines */
     .reward-card {
         background: #000 !important; /* Black background for contrast */
         padding: 40px; 

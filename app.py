@@ -287,8 +287,12 @@ if st.session_state["show_reward"]:
 # 1. First, create the list of what was claimed today
 claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
 
-# 2. Now it is safe to check if the length is 3
+# Create the variable right here so the app can't miss it
+claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
+
+# Now check if we can open the chest
 can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
+
 if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
     st.balloons()
     result = roll_loot_box()
@@ -300,7 +304,6 @@ if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not 
     st.session_state["show_reward"] = result
     save_all()
     st.rerun()
-
 # --- 9. MAIN APP TABS --- 
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)

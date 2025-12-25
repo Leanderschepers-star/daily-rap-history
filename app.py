@@ -267,15 +267,11 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- 8. REWARD OVERLAY & CHEST ---
-
-# 1. Define claimed_today first so it's available for the button and the sidebar later
 claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
 
-# 2. Handle Reward Overlay (Check if it's a dictionary, not just 'True')
-if isinstance(st.session_state.get("show_reward"), dict):
+if st.session_state.get("show_reward"):
     reward = st.session_state["show_reward"]
     r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']
-    
     st.markdown(f"""
         <div class="reward-overlay">
             <div class="reward-card" style="border: 5px solid {r_color}; box-shadow: 0 0 40px {r_color};">
@@ -289,45 +285,41 @@ if isinstance(st.session_state.get("show_reward"), dict):
     st.session_state["show_reward"] = False
     st.rerun()
 
-# --- 8. REWARD OVERLAY & CHEST ---
-if st.session_state["show_reward"]:
-    reward = st.session_state["show_reward"]
-    r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']
-    
-    st.markdown(f"""
-        <div class="reward-overlay">
-            <div class="reward-card" style="border: 5px solid {r_color}; box-shadow: 0 0 40px {r_color};">
-                <h3 style="color: {r_color};">{reward.get('rarity', 'COMMON')} DROP</h3>
-                <h1 style="color: black;">{reward['name']}</h1>
-                <p style="color: #333;">Added to your collection</p>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    time.sleep(4)
-    st.session_state["show_reward"] = None
-    st.rerun()
-
-# 1. First, create the list of what was claimed today
-claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
-
-# Create the variable right here so the app can't miss it
-claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
-
-# Now check if we can open the chest
 can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
-
-if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
+if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open, key="chest_btn"):
     st.balloons()
     result = roll_loot_box()
-    if result['type'] == "COSMETIC":
-        purchases.append(result['name'])
-    else:
-        tasks_done.append(f"{today_str}_CHEST_RC{result['val']}")
-    
+    if result['type'] == "COSMETIC": purchases.append(result['name'])
+    else: tasks_done.append(f"{today_str}_CHEST_RC{result['val']}")
     st.session_state["show_reward"] = result
     save_all()
     st.rerun()
-# --- 9. MAIN APP TABS --- 
+
+# --- 9. SIDEBAR (The Missing Bar) ---
+with st.sidebar:
+    st.title("🎚️ STUDIO RACK")
+    st.metric("Budget", f"{user_points} RC")
+    st.divider()
+    st.subheader("📋 QUEST LOG")
+    for t in daily_tasks:
+        is_done = any(t['id'] in x for x in tasks_done if today_str in x)
+        if is_done: st.success(f"✅ {t['desc']}")
+        elif t['req']:
+            if st.button(f"Claim {t['rc']} RC", key=f"side_{t['id']}"):
+                tasks_done.append(f"{today_str}_{t['id']}_RC{t['rc']}")
+                save_all()
+                st.rerun()
+        else: st.info(f"⚪ {t['desc']}")
+    
+    st.divider()
+    st.subheader("⚙️ GEAR TOGGLE")
+    # This allows you to turn on the Foam you bought
+    current_gear = st.multiselect("Active Gear", options=purchases, default=enabled_gear)
+    if set(current_gear) != set(enabled_gear):
+        save_all(gear_to_save=current_gear)
+        st.rerun()
+
+# --- 10. MAIN APP TABS --- 
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Session Words</h3><h2>📝 {today_word_count}</h2></div>', unsafe_allow_html=True)
@@ -343,63 +335,35 @@ with t_rec:
         st.rerun()
 
 with t_jou:
-    data_dates = [datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()]
-    if today_date not in data_dates: data_dates.append(today_date)
-    curr_d, min_d = max(data_dates), min(data_dates)
-    while curr_d >= min_d:
-        d_s = curr_d.strftime('%d/%m/%Y')
-        content = entry_map.get(d_s, "").strip()
-        dot = "⚪" if not content else "🟢"
-        with st.expander(f"{dot} {d_s} {'(Today)' if d_s == today_str else ''}"):
-            new_txt = st.text_area(f"Edit {d_s}", value=content, height=150, key=f"j_{d_s}")
-            if st.button(f"Update {d_s}", key=f"b_{d_s}"):
-                entry_map[d_s] = new_txt
-                save_all()
-                st.rerun()
-        curr_d -= timedelta(days=1)
+    data_dates = sorted([datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()], reverse=True)
+    for d in data_dates:
+        d_s = d.strftime('%d/%m/%Y')
+        with st.expander(f"📅 {d_s}"):
+            st.text_area("Edit", value=entry_map.get(d_s, ""), height=150, key=f"jou_{d_s}")
 
 with t_shop:
     sc = st.columns(2)
     for i, (item, price) in enumerate(all_shop.items()):
         with sc[i%2]:
             if item in purchases: st.success(f"Owned: {item}")
-            elif st.button(f"Buy {item} ({price} RC)", key=f"s_{i}"):
+            elif st.button(f"Buy {item} ({price} RC)", key=f"buy_{i}"):
                 if user_points >= price:
                     purchases.append(item)
                     save_all()
                     st.rerun()
-                else:
-                    st.error("Not enough RC!")
+                else: st.error("Not enough RC!")
 
 with t_car:
-    st.subheader("🏆 YOUR LIFELONG CAREER")
-    # Show only next 5 unclaimed goals to avoid UI clutter
+    st.subheader("🏆 CAREER MILESTONES")
     upcoming = [a for a in ACHIEVEMENT_GOALS if a['id'] not in claimed][:5]
-    
-    if not upcoming:
-        st.write("🎉 You are a Rap God! All milestones achieved.")
-    
     for a in upcoming:
         is_reached = active_sessions >= a['target']
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(f"**{a['name']}**")
-            st.caption(f"Goal: {a['target']} Sessions | Reward: {a['reward']}")
-            st.progress(min(active_sessions / a['target'], 1.0))
-        with col2:
-            if is_reached:
-                if st.button("Claim", key=a['id']):
-                    drop = roll_loot_box()
-                    if drop['type'] == "COSMETIC": purchases.append(drop['name'])
-                    else: tasks_done.append(f"{today_str}_ACH_RC{drop['val']}")
-                    claimed.append(a['id'])
-                    st.session_state["show_reward"] = drop
-                    save_all()
-                    st.rerun()
-            else:
-                st.info(f"{active_sessions}/{a['target']}")
-
-    with st.expander("📜 See Past Achievements"):
-        for c_id in claimed:
-            if "mil_" in c_id:
-                st.write(f"✅ {c_id} Unlocked")
+        st.write(f"**{a['name']}** ({active_sessions}/{a['target']})")
+        if is_reached and st.button(f"Claim {a['id']}", key=f"ach_{a['id']}"):
+            drop = roll_loot_box()
+            if drop['type'] == "COSMETIC": purchases.append(drop['name'])
+            else: tasks_done.append(f"{today_str}_ACH_RC{drop['val']}")
+            claimed.append(a['id'])
+            st.session_state["show_reward"] = drop
+            save_all()
+            st.rerun()

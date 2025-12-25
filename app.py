@@ -178,7 +178,8 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 
 foam_style = "background-image: radial-gradient(#222 20%, transparent 20%), radial-gradient(#222 20%, transparent 20%) !important; background-color: #111 !important; background-position: 0 0, 10px 10px !important; background-size: 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
-
+# This creates a purple neon glow if ANY enabled gear contains the word "Neon"
+neon_glow_style = "box-shadow: 0 0 20px #bc13fe, inset 0 0 10px #bc13fe !important; border: 1px solid #bc13fe !important;" if any("Neon" in g for g in enabled_gear) else ""
 neon_pulse = ""
 if "Neon Rack Glow 🟣" in enabled_gear:
     neon_pulse = "@keyframes neon { 0% { box-shadow: 0 0 5px #bc13fe; } 50% { box-shadow: 0 0 20px #bc13fe; } 100% { box-shadow: 0 0 5px #bc13fe; } } section[data-testid='stSidebar'] { animation: neon 2s infinite ease-in-out; }"

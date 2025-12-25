@@ -229,14 +229,16 @@ st.markdown(f"""
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
     
-    /* Apply prefix_css and foam_style to the booth */
+    /* Corrected: Single braces here to inject the variables */
     div[data-baseweb="textarea"] textarea {{ 
-        {{foam_style}} 
-        {{prefix_css}} 
+        {foam_style} 
+        {prefix_css} 
         border: none !important; 
     }}
     
-    button[kind="primary"] {{ {{gold_style}} }}
+    /* Corrected: Single braces for gold_style */
+    button[kind="primary"] {{ {gold_style} }}
+
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
@@ -272,6 +274,8 @@ st.markdown(f"""
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         animation: rewardFade 0.6s ease-out;
     }}
+</style>
+""", unsafe_allow_html=True)
 </style>
 """, unsafe_allow_html=True)
 

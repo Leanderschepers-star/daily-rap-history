@@ -1,5 +1,6 @@
 ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: Grammy Shelf 🏆
+ENABLED_GEAR: Holographic Display ⚡
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈
 CLAIMED: day1

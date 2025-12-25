@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 try:
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 except:
-    st.error("GitHub Token missing.")
+    st.error("GitHub Token missing. Please add it to Streamlit Secrets.")
     st.stop()
 
 REPO_NAME = "leanderschepers-star/daily-rap-history"
@@ -21,6 +21,7 @@ if "test_trigger" not in st.session_state:
 if "show_reward" not in st.session_state:
     st.session_state["show_reward"] = False
 
+# --- 2. GITHUB FUNCTIONS ---
 def get_github_file(repo, path):
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
@@ -36,7 +37,7 @@ def update_github_file(content, msg="Update Studio Data"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 2. DATA PARSING ---
+# --- 3. DATA PARSING ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
@@ -56,28 +57,70 @@ for b in blocks:
             lyr_match = re.search(r'LYRICS:\s*(.*?)(?=\s*---|$)', b, re.DOTALL)
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
             if lyr_content: entry_map[d_str] = lyr_content
-# --- NEW CALCULATION BLOCK (INSERT THIS HERE) ---
-# 1. Basic Stats
+
+# --- 4. ENGINE: RARITY & REWARDS ---
+RARITIES = {
+    "COMMON": {"color": "#9da5b4", "chance": 0.60, "rc_range": (50, 150)},
+    "UNCOMMON": {"color": "#1eff00", "chance": 0.25, "rc_range": (200, 400)},
+    "RARE": {"color": "#0070dd", "chance": 0.10, "rc_range": (500, 1000)},
+    "EPIC": {"color": "#a335ee", "chance": 0.04, "rc_range": (1500, 3000)},
+    "LEGENDARY": {"color": "#ff8000", "chance": 0.01, "rc_range": (5000, 10000)}
+}
+
+# Procedural Loot Generation
+COSMETIC_PREFIXES = ["Cyber", "Vintage", "Ghost", "Neon", "Diamond", "Rusty", "Liquid", "Royal", "Midnight", "Electric", "Obsidian", "Chrome", "Golden", "Toxic", "Frozen", "Holographic"]
+COSMETIC_NOUNS = ["Mic", "Cable", "Foam", "Monitor", "Chair", "Desk", "Headphones", "Pre-amp", "Vinyl", "Poster", "Speaker", "Pop-filter", "Sampler", "Synth"]
+
+def roll_loot_box():
+    roll = random.random()
+    cumulative = 0
+    for rarity, data in RARITIES.items():
+        cumulative += data['chance']
+        if roll <= cumulative:
+            # 35% chance for a permanent cosmetic item, 65% for Coins
+            if random.random() < 0.35:
+                item_name = f"{random.choice(COSMETIC_PREFIXES)} {random.choice(COSMETIC_NOUNS)} ({rarity})"
+                return {"type": "COSMETIC", "name": item_name, "rarity": rarity}
+            else:
+                amt = random.randint(*data['rc_range'])
+                return {"type": "RC", "name": f"{amt} Rhyme Coins", "val": amt, "rarity": rarity}
+    return {"type": "RC", "name": "50 RC", "val": 50, "rarity": "COMMON"}
+
+# Generate 500 Achievement Levels automatically
+ACHIEVEMENT_GOALS = []
+for i in range(1, 501):
+    ACHIEVEMENT_GOALS.append({
+        "id": f"mil_{i}",
+        "name": f"Level {i}: {'Rookie' if i<10 else 'Pro' if i<50 else 'Legend'}",
+        "target": i * 5, 
+        "reward": "Mystery Loot Box"
+    })
+
+# --- 5. CALCULATIONS & LOGIC (Fixed Order) ---
+# 1. Stats
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
 today_word_count = len(entry_map.get(today_str, "").split())
 active_sessions = len([k for k, v in entry_map.items() if v.strip()])
 
 # 2. Points & Coins Logic
-# This scans your history for all possible RC rewards (Quests, Chests, Achievements)
+# Scans history for all possible reward types
 bonus_rc = sum([int(re.search(r'RC(\d+)', x).group(1)) for x in tasks_done if "RC" in x])
 
-# Define Shop Prices so the budget can subtract them
+# Expanded Shop Definition
 sidebar_customs = {
     "Brushed Steel Rack 🏗️": 500, "Wooden Side-Panels 🪵": 800,
     "Analog VU Meters 📈": 1200, "Neon Rack Glow 🟣": 2000,
-    "Solid Gold Frame 🪙": 5000, "Diamond Studded Trim 💎": 10000
+    "Solid Gold Frame 🪙": 5000, "Diamond Studded Trim 💎": 10000,
+    "Obsidian VU Meters 🌑": 15000
 }
 gear_items = {
     "Acoustic Foam 🎚️": 150, "LED Strips 🌈": 400, "Gold XLR Cable 🔌": 800,
-    "Vintage Tube Mic 🎙️": 2500, "Mastering Console 🎛️": 6000, "Holographic Display ⚡": 15000
+    "Vintage Tube Mic 🎙️": 2500, "Mastering Console 🎛️": 6000, "Holographic Display ⚡": 15000,
+    "Platinum Record 💿": 20000, "Grammy Shelf 🏆": 50000
 }
 all_shop = {**sidebar_customs, **gear_items}
 
+# Calculate Budget
 user_points = (total_words // 2) + (active_sessions * 10) + bonus_rc - sum([all_shop.get(p, 0) for p in purchases if p in all_shop])
 
 # 3. Streak Logic
@@ -99,50 +142,27 @@ daily_tasks = [
     {"id": "q_words", "desc": f"Write {dynamic_goal} words", "req": today_word_count >= dynamic_goal, "rc": 100},
     {"id": "q_streak", "desc": "Maintain streak (1+)", "req": current_streak >= 1, "rc": 75}
 ]
-# ------------------------------------------------
-# --- 3. DEFINITIONS & RARITY ENGINE ---
-RARITIES = {
-    "COMMON": {"color": "#9da5b4", "chance": 0.60, "rc_range": (50, 150)},
-    "UNCOMMON": {"color": "#1eff00", "chance": 0.25, "rc_range": (200, 400)},
-    "RARE": {"color": "#0070dd", "chance": 0.10, "rc_range": (500, 1000)},
-    "EPIC": {"color": "#a335ee", "chance": 0.04, "rc_range": (1500, 3000)},
-    "LEGENDARY": {"color": "#ff8000", "chance": 0.01, "rc_range": (5000, 10000)}
-}
 
-# Procedural Reward Tables (Add as many strings here as you like)
-COSMETIC_PREFIXES = ["Cyber", "Vintage", "Ghost", "Neon", "Diamond", "Rusty", "Liquid", "Royal", "Midnight", "Electric"]
-COSMETIC_NOUNS = ["Mic", "Cable", "Foam", "Monitor", "Chair", "Desk", "Headphones", "Pre-amp", "Vinyl", "Poster"]
+# 5. Save Function (Must be defined here)
+def save_all(theme_to_save=None, gear_to_save=None):
+    t = theme_to_save if theme_to_save else active_theme
+    g_list = gear_to_save if gear_to_save is not None else enabled_gear
+    content = f"ACTIVE_THEME: {t}\n"
+    for g in g_list: content += f"ENABLED_GEAR: {g}\n"
+    for p in sorted(purchases): content += f"PURCHASE: {p}\n"
+    for c in sorted(claimed): content += f"CLAIMED: {c}\n"
+    for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
+    clean_map = {k: v for k, v in entry_map.items() if v.strip()}
+    for d in sorted(clean_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
+        content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{clean_map[d]}\n------------------------------"
+    update_github_file(content)
 
-def roll_loot_box():
-    roll = random.random()
-    cumulative = 0
-    for rarity, data in RARITIES.items():
-        cumulative += data['chance']
-        if roll <= cumulative:
-            # 30% chance for a permanent cosmetic item, 70% for Coins
-            if random.random() < 0.30:
-                item_name = f"{random.choice(COSMETIC_PREFIXES)} {random.choice(COSMETIC_NOUNS)} ({rarity})"
-                return {"type": "COSMETIC", "name": item_name, "rarity": rarity}
-            else:
-                amt = random.randint(*data['rc_range'])
-                return {"type": "RC", "name": f"{amt} Rhyme Coins", "val": amt, "rarity": rarity}
-    return {"type": "RC", "name": "50 Rhyme Coins", "val": 50, "rarity": "COMMON"}
-
-# Generate 100 Achievement Slots automatically
-ACHIEVEMENT_GOALS = []
-for i in range(1, 101):
-    ACHIEVEMENT_GOALS.append({
-        "id": f"milestone_{i}",
-        "name": f"Level {i}: {'Rookie' if i<10 else 'Pro' if i<50 else 'Legend'}",
-        "target": i * 5, # Every 5 sessions
-        "reward": "Exclusive Cosmetic Drop"
-    })
-# --- 4. VISUAL ENGINE ---
+# --- 6. VISUAL CSS ---
 themes_css = {
     "Default Dark": "background: #0f0f0f;",
     "Classic Studio 🎙️": "background-color: #1a1e23; background-image: linear-gradient(0deg, #23282e 1px, transparent 1px), linear-gradient(90deg, #23282e 1px, transparent 1px); background-size: 40px 40px; color: #d1d8e0;",
     "Golden Era 🪙": "background: linear-gradient(135deg, #1a1a1a 0%, #3d2b00 100%); color: #ffd700;",
-    "Midnight Diamond 💎": "background: radial-gradient(circle, #0a0e14 0%, #000000 100%); color: #b9f2ff;"
+    "Midnight Reflection 🌧️": "background: radial-gradient(circle, #0a0e14 0%, #000000 100%); color: #b9f2ff;"
 }
 
 rack_style = "background: #111; border-right: 1px solid #333;"
@@ -154,28 +174,17 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 foam_style = "background: repeating-conic-gradient(#000 0% 25%, #111 0% 50%) 50% / 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
-# SPECIAL UNLOCK: NEON GLOW PULSE
 neon_pulse = ""
 if "Neon Rack Glow 🟣" in enabled_gear:
     neon_pulse = "@keyframes neon { 0% { box-shadow: 0 0 5px #bc13fe; } 50% { box-shadow: 0 0 20px #bc13fe; } 100% { box-shadow: 0 0 5px #bc13fe; } } section[data-testid='stSidebar'] { animation: neon 2s infinite ease-in-out; }"
 
-# ANIMATED LED STRIPS LOGIC
 led_anim_css = ""
 if "LED Strips 🌈" in enabled_gear:
     led_anim_css = """
     @keyframes rotate { 100% { transform: rotate(1turn); } }
-    div[data-baseweb="textarea"] {
-        position: relative; z-index: 0; border-radius: 10px; overflow: hidden; padding: 4px; background: none !important; border: none !important;
-    }
-    div[data-baseweb="textarea"]::before {
-        content: ''; position: absolute; z-index: -2; left: -50%; top: -50%; width: 200%; height: 200%;
-        background-image: conic-gradient(#ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000);
-        animation: rotate 4s linear infinite;
-    }
-    div[data-baseweb="textarea"]::after {
-        content: ''; position: absolute; z-index: -1; left: 4px; top: 4px; width: calc(100% - 8px); height: calc(100% - 8px);
-        background: #0f0f0f; border-radius: 7px;
-    }
+    div[data-baseweb="textarea"] { position: relative; z-index: 0; border-radius: 10px; overflow: hidden; padding: 4px; background: none !important; border: none !important; }
+    div[data-baseweb="textarea"]::before { content: ''; position: absolute; z-index: -2; left: -50%; top: -50%; width: 200%; height: 200%; background-image: conic-gradient(#ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff, #ff0000); animation: rotate 4s linear infinite; }
+    div[data-baseweb="textarea"]::after { content: ''; position: absolute; z-index: -1; left: 4px; top: 4px; width: calc(100% - 8px); height: calc(100% - 8px); background: #0f0f0f; border-radius: 7px; }
     """
 
 st.set_page_config(page_title="Leander Studio", layout="wide")
@@ -209,18 +218,20 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR ---
+# --- 7. SIDEBAR (Safe to run now) ---
 with st.sidebar:
     st.title("🎚️ STUDIO RACK")
     
-    # VU Meters logic (Includes the new Obsidian rarity version)
     if any(x in purchases for x in ["Analog VU Meters 📈", "Obsidian VU Meters 🌑"]):
         st.write("Input Levels")
         st.markdown('<div class="vu-meter"></div>', unsafe_allow_html=True)
     
-    # Line 174 Fix: Displays the points calculated in your new Section 3
     st.metric("Budget", f"{user_points} RC")
     
+    with st.expander("💎 Rarity Guide"):
+        for r, d in RARITIES.items():
+            st.markdown(f"<span style='color:{d['color']}'>● {r}</span>", unsafe_allow_html=True)
+
     st.divider()
     st.subheader("📋 QUEST LOG")
     claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
@@ -239,9 +250,9 @@ with st.sidebar:
     st.divider()
     st.subheader("⚙️ SETTINGS")
     
-    # UPDATED THEME UNLOCKS: Checking new milestone IDs
+    # Unlock themes based on Level Milestones
     unlocked_t = ["Default Dark"]
-    if "mil_1" in claimed: unlocked_t.append("Classic Studio 🎙️")
+    if any("mil_" in c and int(c.split('_')[1]) >= 1 for c in claimed): unlocked_t.append("Classic Studio 🎙️")
     if any("mil_" in c and int(c.split('_')[1]) >= 5 for c in claimed): unlocked_t.append("Golden Era 🪙")
     if any("mil_" in c and int(c.split('_')[1]) >= 20 for c in claimed): unlocked_t.append("Midnight Reflection 🌧️")
     
@@ -253,15 +264,13 @@ with st.sidebar:
     st.write("**Toggle Gear & Collection**")
     new_gear_list = []
     
-    # DYNAMIC GEAR LIST:
-    # This automatically shows EVERYTHING you've ever won from a chest or achievement
-    # plus the standard shop gear.
+    # Show Standard Shop Gear + Any Cosmetic dropped from Chests
     standard_gear = list(gear_items.keys()) + ["Neon Rack Glow 🟣"]
     # Filter purchases to only show things that look like gear/cosmetics
     all_unlocked_gear = list(set(standard_gear + [p for p in purchases if "(" in p or "🎨" in p or any(word in p for word in COSMETIC_NOUNS)]))
     
-    for g in all_unlocked_gear:
-        # Check if bought, won in chest, or special milestone reward
+    for g in sorted(all_unlocked_gear):
+        # You own it if you bought it OR claimed it in a milestone/chest
         is_owned = (g in purchases) or (g in claimed) or (g == "Neon Rack Glow 🟣" and any("mil_" in c and int(c.split('_')[1]) >= 3 for c in claimed))
         
         if is_owned:
@@ -275,17 +284,19 @@ with st.sidebar:
     st.divider()
     if st.button("🎁 TEST CHEST ANIMATION", use_container_width=True):
         st.session_state["test_trigger"] = True
+        st.session_state["show_reward"] = {"name": "Test Reward", "rarity": "LEGENDARY", "type": "RC"}
         st.rerun()
 
-# --- 6. CHEST SYSTEM ---
+# --- 8. REWARD OVERLAY ---
 if st.session_state["show_reward"]:
     reward = st.session_state["show_reward"]
-    r_color = RARITIES.get(reward.get('rarity', 'COMMON'))['color']
+    # Fallback to COMMON color if something goes wrong
+    r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']
     
     st.markdown(f"""
         <div class="reward-overlay">
             <div class="reward-card" style="border: 5px solid {r_color}; box-shadow: 0 0 40px {r_color};">
-                <h3 style="color: {r_color};">{reward['rarity']} DROP</h3>
+                <h3 style="color: {r_color};">{reward.get('rarity', 'COMMON')} DROP</h3>
                 <h1 style="color: black;">{reward['name']}</h1>
                 <p style="color: #333;">Added to your collection</p>
             </div>
@@ -307,7 +318,8 @@ if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not 
     st.session_state["show_reward"] = result
     save_all()
     st.rerun()
-# --- 7. MAIN UI ---
+
+# --- 9. MAIN UI ---
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Session Words</h3><h2>📝 {today_word_count}</h2></div>', unsafe_allow_html=True)
@@ -318,7 +330,9 @@ t_rec, t_jou, t_shop, t_car = st.tabs(["🎙️ Booth", "📖 Journal", "🏪 Ra
 with t_rec:
     lyrics = st.text_area("Drop your lyrics here...", value=entry_map.get(today_str, ""), height=400)
     if st.button("🚀 SAVE TO HISTORY", type="primary", use_container_width=True):
-        entry_map[today_str] = lyrics; save_all(); st.rerun()
+        entry_map[today_str] = lyrics
+        save_all()
+        st.rerun()
 
 with t_jou:
     data_dates = [datetime.strptime(d, '%d/%m/%Y').date() for d in entry_map.keys()]
@@ -331,7 +345,9 @@ with t_jou:
         with st.expander(f"{dot} {d_s} {'(Today)' if d_s == today_str else ''}"):
             new_txt = st.text_area(f"Edit {d_s}", value=content, height=150, key=f"j_{d_s}")
             if st.button(f"Update {d_s}", key=f"b_{d_s}"):
-                entry_map[d_s] = new_txt; save_all(); st.rerun()
+                entry_map[d_s] = new_txt
+                save_all()
+                st.rerun()
         curr_d -= timedelta(days=1)
 
 with t_shop:
@@ -340,40 +356,42 @@ with t_shop:
         with sc[i%2]:
             if item in purchases: st.success(f"Owned: {item}")
             elif st.button(f"Buy {item} ({price} RC)", key=f"s_{i}"):
-                if user_points >= price: purchases.append(item); save_all(); st.rerun()
+                if user_points >= price:
+                    purchases.append(item)
+                    save_all()
+                    st.rerun()
+                else:
+                    st.error("Not enough RC!")
 
 with t_car:
     st.subheader("🏆 YOUR LIFELONG CAREER")
-    for a in ACHIEVEMENT_GOALS:
-        # Check if milestone is reached (e.g., based on active_sessions)
+    # Only show the next 5 unclaimed achievements to keep the UI clean
+    upcoming = [a for a in ACHIEVEMENT_GOALS if a['id'] not in claimed][:5]
+    
+    if not upcoming:
+        st.write("🎉 You are a Rap God! All milestones achieved.")
+    
+    for a in upcoming:
         is_reached = active_sessions >= a['target']
-        is_claimed = a['id'] in claimed
-        
         col1, col2 = st.columns([4, 1])
         with col1:
             st.write(f"**{a['name']}**")
             st.caption(f"Goal: {a['target']} Sessions | Reward: {a['reward']}")
             st.progress(min(active_sessions / a['target'], 1.0))
         with col2:
-            if is_claimed:
-                st.success("Claimed")
-            elif is_reached:
+            if is_reached:
                 if st.button("Claim", key=a['id']):
-                    # Achievement rewards are always high rarity
                     drop = roll_loot_box()
                     if drop['type'] == "COSMETIC": purchases.append(drop['name'])
                     else: tasks_done.append(f"{today_str}_ACH_RC{drop['val']}")
                     claimed.append(a['id'])
                     st.session_state["show_reward"] = drop
-                    save_all(); st.rerun()
+                    save_all()
+                    st.rerun()
             else:
                 st.info(f"{active_sessions}/{a['target']}")
-    for a in achs:
-        st.subheader(f"{a['name']} ({a['goal']})")
-        st.write(f"🎁 Reward: **{a['reward']}**")
-        st.progress(min(a['curr'] / a['target'], 1.0))
-        if a['id'] not in claimed and a['curr'] >= a['target']:
-            if st.button(f"Claim Achievement", key=f"ach_{a['id']}"):
-                claimed.append(a['id']); save_all(); st.rerun()
-        elif a['id'] in claimed:
-            st.success("Claimed & Unlocked!")
+
+    with st.expander("📜 See Past Achievements"):
+        for c_id in claimed:
+            if "mil_" in c_id:
+                st.write(f"✅ {c_id} Unlocked")

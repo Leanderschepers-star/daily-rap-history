@@ -202,7 +202,7 @@ st.markdown(f"""
         background: transparent !important;
     }}
 
-    button[kind="primary"] {{ {gold_style} }}
+    button[kind="primary"] {{ {{gold_style}} }}
 </style>
 """, unsafe_allow_html=True)
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""

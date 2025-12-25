@@ -231,12 +231,12 @@ st.markdown(f"""
     
     /* Apply prefix_css and foam_style to the booth */
     div[data-baseweb="textarea"] textarea {{ 
-        {foam_style} 
-        {prefix_css} 
+        {{foam_style}} 
+        {{prefix_css}} 
         border: none !important; 
     }}
     
-    button[kind="primary"] {{ {gold_style} }}
+    button[kind="primary"] {{ {{gold_style}} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}

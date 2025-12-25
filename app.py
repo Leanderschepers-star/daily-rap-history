@@ -267,6 +267,44 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- 8. REWARD OVERLAY & CHEST ---
+
+# 1. Define claimed_today first so it's available for the button and the sidebar later
+claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
+
+# 2. Handle Reward Overlay (Check if it's a dictionary, not just 'True')
+if isinstance(st.session_state.get("show_reward"), dict):
+    reward = st.session_state["show_reward"]
+    r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']
+    
+    st.markdown(f"""
+        <div class="reward-overlay">
+            <div class="reward-card" style="border: 5px solid {r_color}; box-shadow: 0 0 40px {r_color};">
+                <h3 style="color: {r_color};">{reward.get('rarity', 'COMMON')} DROP</h3>
+                <h1 style="color: white !important;">{reward['name']}</h1>
+                <p style="color: #aaa;">Added to your collection</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    time.sleep(4)
+    st.session_state["show_reward"] = False
+    st.rerun()
+
+# 3. Chest Logic
+can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
+
+if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
+    st.balloons()
+    result = roll_loot_box()
+    if result['type'] == "COSMETIC":
+        purchases.append(result['name'])
+    else:
+        tasks_done.append(f"{today_str}_CHEST_RC{result['val']}")
+    
+    st.session_state["show_reward"] = result
+    save_all()
+    st.rerun()
+
+# --- 8. REWARD OVERLAY & CHEST ---
 if st.session_state["show_reward"]:
     reward = st.session_state["show_reward"]
     r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']

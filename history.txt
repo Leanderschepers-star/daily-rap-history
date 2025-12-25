@@ -1,5 +1,6 @@
 ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: LED Strips 🌈
+ENABLED_GEAR: Neon Rack Glow 🟣
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈
 CLAIMED: day1

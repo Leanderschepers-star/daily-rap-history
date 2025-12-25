@@ -1,5 +1,4 @@
 ACTIVE_THEME: Default Dark
-ENABLED_GEAR: Neon Rack Glow 🟣
 ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈

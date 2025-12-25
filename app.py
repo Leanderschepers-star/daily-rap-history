@@ -57,55 +57,43 @@ for b in blocks:
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
             if lyr_content: entry_map[d_str] = lyr_content
 
-# --- 3. CALCULATIONS ---
-sidebar_customs = {
-    "Brushed Steel Rack 🏗️": 500, "Wooden Side-Panels 🪵": 800,
-    "Analog VU Meters 📈": 1200, "Neon Rack Glow 🟣": 2000,
-    "Solid Gold Frame 🪙": 5000, "Diamond Studded Trim 💎": 10000
+# --- 3. DEFINITIONS & RARITY ENGINE ---
+RARITIES = {
+    "COMMON": {"color": "#9da5b4", "chance": 0.60, "rc_range": (50, 150)},
+    "UNCOMMON": {"color": "#1eff00", "chance": 0.25, "rc_range": (200, 400)},
+    "RARE": {"color": "#0070dd", "chance": 0.10, "rc_range": (500, 1000)},
+    "EPIC": {"color": "#a335ee", "chance": 0.04, "rc_range": (1500, 3000)},
+    "LEGENDARY": {"color": "#ff8000", "chance": 0.01, "rc_range": (5000, 10000)}
 }
-gear_items = {
-    "Acoustic Foam 🎚️": 150, "LED Strips 🌈": 400, "Gold XLR Cable 🔌": 800,
-    "Vintage Tube Mic 🎙️": 2500, "Mastering Console 🎛️": 6000, "Holographic Display ⚡": 15000
-}
-all_shop = {**sidebar_customs, **gear_items}
 
-total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
-today_word_count = len(entry_map.get(today_str, "").split())
-active_sessions = len([k for k, v in entry_map.items() if v.strip()])
-bonus_rc = sum([int(re.search(r'_RC(\d+)', x).group(1)) if "_RC" in x else 0 for x in tasks_done])
-user_points = (total_words // 2) + (active_sessions * 10) + bonus_rc - sum([all_shop.get(p, 0) for p in purchases])
+# Procedural Reward Tables (Add as many strings here as you like)
+COSMETIC_PREFIXES = ["Cyber", "Vintage", "Ghost", "Neon", "Diamond", "Rusty", "Liquid", "Royal", "Midnight", "Electric"]
+COSMETIC_NOUNS = ["Mic", "Cable", "Foam", "Monitor", "Chair", "Desk", "Headphones", "Pre-amp", "Vinyl", "Poster"]
 
-current_streak = 0
-check_date = today_date
-if today_str not in entry_map: check_date = today_date - timedelta(days=1)
-while True:
-    d_key = check_date.strftime('%d/%m/%Y')
-    if d_key in entry_map and entry_map[d_key].strip():
-        current_streak += 1
-        check_date -= timedelta(days=1)
-    else: break
+def roll_loot_box():
+    roll = random.random()
+    cumulative = 0
+    for rarity, data in RARITIES.items():
+        cumulative += data['chance']
+        if roll <= cumulative:
+            # 30% chance for a permanent cosmetic item, 70% for Coins
+            if random.random() < 0.30:
+                item_name = f"{random.choice(COSMETIC_PREFIXES)} {random.choice(COSMETIC_NOUNS)} ({rarity})"
+                return {"type": "COSMETIC", "name": item_name, "rarity": rarity}
+            else:
+                amt = random.randint(*data['rc_range'])
+                return {"type": "RC", "name": f"{amt} Rhyme Coins", "val": amt, "rarity": rarity}
+    return {"type": "RC", "name": "50 Rhyme Coins", "val": 50, "rarity": "COMMON"}
 
-random.seed(today_str)
-dynamic_goal = random.choice([50, 100, 150, 250])
-daily_tasks = [
-    {"id": "q_rec", "desc": "Record today's session", "req": today_str in entry_map, "rc": 50},
-    {"id": "q_words", "desc": f"Write {dynamic_goal} words", "req": today_word_count >= dynamic_goal, "rc": 100},
-    {"id": "q_streak", "desc": "Maintain streak (1+)", "req": current_streak >= 1, "rc": 75}
-]
-
-def save_all(theme_to_save=None, gear_to_save=None):
-    t = theme_to_save if theme_to_save else active_theme
-    g_list = gear_to_save if gear_to_save is not None else enabled_gear
-    content = f"ACTIVE_THEME: {t}\n"
-    for g in g_list: content += f"ENABLED_GEAR: {g}\n"
-    for p in sorted(purchases): content += f"PURCHASE: {p}\n"
-    for c in sorted(claimed): content += f"CLAIMED: {c}\n"
-    for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
-    clean_map = {k: v for k, v in entry_map.items() if v.strip()}
-    for d in sorted(clean_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
-        content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{clean_map[d]}\n------------------------------"
-    update_github_file(content)
-
+# Generate 100 Achievement Slots automatically
+ACHIEVEMENT_GOALS = []
+for i in range(1, 101):
+    ACHIEVEMENT_GOALS.append({
+        "id": f"milestone_{i}",
+        "name": f"Level {i}: {'Rookie' if i<10 else 'Pro' if i<50 else 'Legend'}",
+        "target": i * 5, # Every 5 sessions
+        "reward": "Exclusive Cosmetic Drop"
+    })
 # --- 4. VISUAL ENGINE ---
 themes_css = {
     "Default Dark": "background: #0f0f0f;",
@@ -226,39 +214,34 @@ with st.sidebar:
 
 # --- 6. CHEST SYSTEM ---
 if st.session_state["show_reward"]:
+    reward = st.session_state["show_reward"]
+    r_color = RARITIES.get(reward.get('rarity', 'COMMON'))['color']
+    
     st.markdown(f"""
         <div class="reward-overlay">
-            <div class="reward-card">
-                <h1 style="margin:0; font-size: 3rem;">🎁</h1>
-                <h2 style="color: black;">REWARD UNLOCKED</h2>
-                <hr style="border-color: black;">
-                <h1 style="font-size: 3.5rem; margin: 10px 0; color: black;">+250</h1>
-                <h3 style="color: black;">Rhyme Coins (RC)</h3>
+            <div class="reward-card" style="border: 5px solid {r_color}; box-shadow: 0 0 40px {r_color};">
+                <h3 style="color: {r_color};">{reward['rarity']} DROP</h3>
+                <h1 style="color: black;">{reward['name']}</h1>
+                <p style="color: #333;">Added to your collection</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
-    time.sleep(3.5)
-    st.session_state["show_reward"] = False
+    time.sleep(4)
+    st.session_state["show_reward"] = None
     st.rerun()
 
-st.markdown("<h1 style='text-align:center;'>STUDIO CONSOLE</h1>", unsafe_allow_html=True)
-
-can_open = (len(claimed_today) == 3 and not any("COMPLETION" in x for x in tasks_done if today_str in x))
-if st.session_state["test_trigger"] or can_open:
-    btn_label = "🎁 OPEN SESSION CHEST" if not st.session_state["test_trigger"] else "🎁 TEST CHEST ANIMATION"
-    if st.button(btn_label, type="primary", use_container_width=True):
-        with st.empty():
-            for i in range(0, 260, 20):
-                st.markdown(f"<h2 style='text-align:center; color:gold;'>Crunching Data: {i} RC...</h2>", unsafe_allow_html=True)
-                time.sleep(0.05)
-        st.balloons()
-        if not st.session_state["test_trigger"]:
-            tasks_done.append(f"{today_str}_COMPLETION_RC250")
-            save_all()
-        st.session_state["test_trigger"] = False
-        st.session_state["show_reward"] = True
-        st.rerun()
-
+can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
+if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
+    st.balloons()
+    result = roll_loot_box()
+    if result['type'] == "COSMETIC":
+        purchases.append(result['name'])
+    else:
+        tasks_done.append(f"{today_str}_CHEST_RC{result['val']}")
+    
+    st.session_state["show_reward"] = result
+    save_all()
+    st.rerun()
 # --- 7. MAIN UI ---
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
@@ -295,12 +278,31 @@ with t_shop:
                 if user_points >= price: purchases.append(item); save_all(); st.rerun()
 
 with t_car:
-    achs = [
-        {"id": "day1", "name": "Intern", "goal": "1 Session", "reward": "Ambience: Classic Studio 🎙️", "target": 1, "curr": active_sessions},
-        {"id": "streak_3", "name": "Rookie", "goal": "3 Day Streak", "reward": "Gear: Neon Rack Glow 🟣", "target": 3, "curr": current_streak},
-        {"id": "words_500", "name": "Writer", "goal": "500 Words", "reward": "Ambience: Golden Era 🪙", "target": 500, "curr": total_words},
-        {"id": "words_2000", "name": "Artist", "goal": "2000 Words", "reward": "Gear: Mastering Console 🛛️", "target": 2000, "curr": total_words},
-    ]
+    st.subheader("🏆 YOUR LIFELONG CAREER")
+    for a in ACHIEVEMENT_GOALS:
+        # Check if milestone is reached (e.g., based on active_sessions)
+        is_reached = active_sessions >= a['target']
+        is_claimed = a['id'] in claimed
+        
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(f"**{a['name']}**")
+            st.caption(f"Goal: {a['target']} Sessions | Reward: {a['reward']}")
+            st.progress(min(active_sessions / a['target'], 1.0))
+        with col2:
+            if is_claimed:
+                st.success("Claimed")
+            elif is_reached:
+                if st.button("Claim", key=a['id']):
+                    # Achievement rewards are always high rarity
+                    drop = roll_loot_box()
+                    if drop['type'] == "COSMETIC": purchases.append(drop['name'])
+                    else: tasks_done.append(f"{today_str}_ACH_RC{drop['val']}")
+                    claimed.append(a['id'])
+                    st.session_state["show_reward"] = drop
+                    save_all(); st.rerun()
+            else:
+                st.info(f"{active_sessions}/{a['target']}")
     for a in achs:
         st.subheader(f"{a['name']} ({a['goal']})")
         st.write(f"🎁 Reward: **{a['reward']}**")

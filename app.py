@@ -170,6 +170,14 @@ themes_css = {
     "Midnight Reflection 🌧️": "background: radial-gradient(circle, #0a0e14 0%, #000000 100%); color: #b9f2ff;"
 }
 
+# --- STYLE ENGINE: Effects for Loot Box Gear ---
+prefix_css = ""
+if any("Toxic" in g for g in enabled_gear): prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
+if any("Frozen" in g for g in enabled_gear): prefix_css += "background: rgba(173, 216, 230, 0.2) !important; border: 1px solid #00f2ff !important;"
+if any("Electric" in g for g in enabled_gear): prefix_css += "border-left: 5px solid #f1c40f !important; border-right: 5px solid #f1c40f !important;"
+if any("Ghost" in g for g in enabled_gear): prefix_css += "opacity: 0.7; filter: blur(0.5px);"
+if any("Chrome" in g for g in enabled_gear): prefix_css += "background: linear-gradient(145deg, #777, #fff, #777) !important; color: black !important;"
+
 rack_style = "background: #111; border-right: 1px solid #333;"
 if "Brushed Steel Rack 🏗️" in purchases: rack_style = "background: linear-gradient(180deg, #2c3e50, #000); border-right: 2px solid #95a5a6;"
 if "Wooden Side-Panels 🪵" in purchases: rack_style += "border-right: 10px solid #5d4037;"
@@ -178,10 +186,9 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 
 foam_style = "background-image: radial-gradient(#222 20%, transparent 20%), radial-gradient(#222 20%, transparent 20%) !important; background-color: #111 !important; background-position: 0 0, 10px 10px !important; background-size: 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
-# This creates a purple neon glow if ANY enabled gear contains the word "Neon"
-neon_glow_style = "box-shadow: 0 0 20px #bc13fe, inset 0 0 10px #bc13fe !important; border: 1px solid #bc13fe !important;" if any("Neon" in g for g in enabled_gear) else ""
+
 neon_pulse = ""
-if "Neon Rack Glow 🟣" in enabled_gear:
+if "Neon Rack Glow 🟣" in enabled_gear or any("Neon" in g for g in enabled_gear):
     neon_pulse = "@keyframes neon { 0% { box-shadow: 0 0 5px #bc13fe; } 50% { box-shadow: 0 0 20px #bc13fe; } 100% { box-shadow: 0 0 5px #bc13fe; } } section[data-testid='stSidebar'] { animation: neon 2s infinite ease-in-out; }"
 
 led_anim_css = ""
@@ -201,14 +208,19 @@ st.markdown(f"""
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
     .stats-card {{ background: rgba(0, 0, 0, 0.7); padding: 20px; border-radius: 12px; border: 1px solid #444; text-align: center; }}
-    div[data-baseweb="textarea"] textarea {{ {foam_style} border: none !important; }}
+    
+    /* Apply prefix_css and foam_style to the booth */
+    div[data-baseweb="textarea"] textarea {{ 
+        {foam_style} 
+        {prefix_css} 
+        border: none !important; 
+    }}
+    
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}
     
-    /* Animations */
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
-    @keyframes shine {{ 0% {{ background-position: -200%; }} 100% {{ background-position: 200%; }} }}
-@keyframes shake {{
+    @keyframes shake {{
       0% {{ transform: translate(1px, 1px) rotate(0deg); }}
       10% {{ transform: translate(-1px, -2px) rotate(-1deg); }}
       20% {{ transform: translate(-3px, 0px) rotate(1deg); }}
@@ -223,7 +235,7 @@ st.markdown(f"""
     }}
 
     .reward-card {{
-        background: #000 !important; /* Black background for contrast */
+        background: #000 !important;
         padding: 40px; 
         border-radius: 20px; 
         text-align: center;

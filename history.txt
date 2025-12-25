@@ -1,6 +1,6 @@
 ACTIVE_THEME: Classic Studio 🎙️
-ENABLED_GEAR: LED Strips 🌈
 ENABLED_GEAR: Neon Rack Glow 🟣
+ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈
 CLAIMED: day1
@@ -20,6 +20,26 @@ TASK_DONE: 24/12/2025_q_streak_RC75
 TASK_DONE: 24/12/2025_q_words_RC100
 TASK_DONE: 25/12/2025_q_streak_RC75
 
+------------------------------
+DATE: 25/12/2025
+LYRICS:
+every therapy feels like an interview
+they keep telling me thing I already knew
+i know that my good mind is hard to find
+that my thoughts get intertwined 
+that I could be with hunderds of people
+and i'll always be left behind
+
+I feel like I live my life all alone
+even with friends, i'm always in a different zone
+but maybe i'll get to achieve
+everything that I believe
+reaching others the way that nate did with me
+but even then
+ The roar of the crowd is a lonely sound
+when the only voice I hear
+is the darkness that I found
+------------------------------
 ------------------------------
 DATE: 24/12/2025
 LYRICS:

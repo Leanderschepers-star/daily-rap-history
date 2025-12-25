@@ -184,7 +184,27 @@ if "Wooden Side-Panels 🪵" in purchases: rack_style += "border-right: 10px sol
 if "Solid Gold Frame 🪙" in purchases: rack_style = "background: linear-gradient(180deg, #bf953f, #fcf6ba, #b38728); border-right: 4px solid #aa771c; color: black !important;"
 if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px 30px rgba(185, 242, 255, 0.4);"
 
-foam_style = "background-image: radial-gradient(#222 20%, transparent 20%), radial-gradient(#222 20%, transparent 20%) !important; background-color: #111 !important; background-position: 0 0, 10px 10px !important; background-size: 20px 20px !important; color: #fff !important;" if "Acoustic Foam 🎚️" in enabled_gear else ""
+st.markdown(f"""
+<style>
+    {led_anim_css}
+    {neon_pulse}
+    .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
+    section[data-testid="stSidebar"] {{ {rack_style} }}
+
+    /* TARGET THE ACTUAL TEXT AREA INTERIOR */
+    div[data-baseweb="textarea"] textarea {{ 
+        {foam_style} 
+        {prefix_css} 
+    }}
+
+    /* FIX: Ensure the container doesn't block the background */
+    div[data-baseweb="textarea"] {{
+        background: transparent !important;
+    }}
+
+    button[kind="primary"] {{ {gold_style} }}
+</style>
+""", unsafe_allow_html=True)
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
 neon_pulse = ""

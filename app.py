@@ -208,6 +208,29 @@ st.markdown(f"""
     @keyframes rewardFade {{ from {{ opacity: 0; transform: scale(0.5); }} to {{ opacity: 1; transform: scale(1); }} }}
     @keyframes shine {{ 0% {{ background-position: -200%; }} 100% {{ background-position: 200%; }} }}
     
+    @keyframes shake {
+      0% { transform: translate(1px, 1px) rotate(0deg); }
+      10% { transform: translate(-1px, -2px) rotate(-1deg); }
+      20% { transform: translate(-3px, 0px) rotate(1deg); }
+      30% { transform: translate(3px, 2px) rotate(0deg); }
+      40% { transform: translate(1px, -1px) rotate(1deg); }
+      50% { transform: translate(-1px, 2px) rotate(-1deg); }
+      60% { transform: translate(-3px, 1px) rotate(0deg); }
+      70% { transform: translate(3px, 1px) rotate(-1deg); }
+      80% { transform: translate(-1px, -1px) rotate(1deg); }
+      90% { transform: translate(1px, 2px) rotate(0deg); }
+      100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+    /* 2. Replace your .reward-card class with this one */
+    .reward-card {
+        background: #000 !important;
+        padding: 40px; border-radius: 20px; text-align: center;
+        color: white !important; font-weight: bold; width: 350px;
+        animation: shake 0.2s infinite, rewardFade 0.6s ease-out;
+        border: 4px solid white;
+    }
+    
     .reward-overlay {{
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background: rgba(0,0,0,0.9); z-index: 9999;

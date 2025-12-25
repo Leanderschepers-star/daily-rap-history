@@ -1,5 +1,6 @@
 ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: Acoustic Foam 🔇
+ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: LED Strips 🌈
 CLAIMED: day1

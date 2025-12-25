@@ -189,8 +189,17 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 # Enhanced Acoustic Foam (3D texture)
 foam_style = ""
 if "Acoustic Foam 🎚️" in enabled_gear:
-    foam_style = "background-color: #111 !important; background-image: radial-gradient(#000 15%, transparent 16%), radial-gradient(#333 15%, transparent 16%) !important; background-position: 0 0, 1px 1px !important; background-size: 15px 15px !important; color: #fff !important;"
-
+    # High-contrast 3D Studded Pattern
+    foam_style = """
+    background-color: #111 !important;
+    background-image: 
+        radial-gradient(circle at 2px 2px, #333 1px, transparent 0),
+        radial-gradient(circle at 12px 12px, #000 1px, transparent 0),
+        repeating-conic-gradient(#1a1a1a 0% 25%, #111 25% 50%) !important;
+    background-size: 20px 20px !important;
+    color: #00ff00 !important;
+    border: 2px solid #444 !important;
+    """
 gold_style = "background: #d4af37 !important; color: black !important;" if "Gold XLR Cable 🔌" in enabled_gear else ""
 
 neon_pulse = ""
@@ -220,12 +229,32 @@ st.markdown(f"""
     /* THE BOOTH INTERIOR */
     div[data-baseweb="textarea"] textarea {{ 
         {foam_style} 
-        {prefix_css} 
+        prefix_css = ""
+if any("Toxic" in g for g in enabled_gear): 
+    prefix_css += "color: #39ff14 !important; text-shadow: 0 0 10px #39ff14;"
+if any("Frozen" in g for g in enabled_gear): 
+    # Use rgba so it's a semi-transparent blue tint over the foam
+    prefix_css += "background-color: rgba(0, 242, 255, 0.15) !important; border: 1px solid #00f2ff !important;"
+if any("Chrome" in g for g in enabled_gear): 
+    # Semi-transparent silver sheen
+    prefix_css += "background-color: rgba(255, 255, 255, 0.1) !important; box-shadow: inset 0 0 20px white;"
         border: none !important; 
     }}
     
     /* Helper to ensure transparency for LED strips */
-    div[data-baseweb="textarea"] {{ background: transparent !important; }}
+   /* THE BOOTH INTERIOR */
+    div[data-baseweb="textarea"] textarea { 
+        {foam_style} 
+        {prefix_css} 
+        background-attachment: local !important;
+        border: none !important; 
+    }
+
+    /* Force the background to show through Streamlit's default layers */
+    div[data-baseweb="textarea"] {
+        background: transparent !important;
+        border: none !important;
+    }
     
     button[kind="primary"] {{ {gold_style} }}
     .vu-meter {{ height: 12px; background: linear-gradient(90deg, #2ecc71 70%, #f1c40f 85%, #e74c3c 100%); border-radius: 6px; margin-bottom: 20px; }}

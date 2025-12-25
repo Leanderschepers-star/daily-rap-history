@@ -1,4 +1,4 @@
-ACTIVE_THEME: Classic Studio 🎙️
+ACTIVE_THEME: Golden Era 🪙
 ENABLED_GEAR: Neon Rack Glow 🟣
 ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇

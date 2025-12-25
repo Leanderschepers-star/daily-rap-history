@@ -1,4 +1,4 @@
-ACTIVE_THEME: Golden Era 🪙
+ACTIVE_THEME: Default Dark
 ENABLED_GEAR: Neon Rack Glow 🟣
 ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇

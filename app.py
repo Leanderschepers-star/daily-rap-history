@@ -169,43 +169,65 @@ st.markdown(f"""
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎚️ STUDIO RACK")
-    if "Analog VU Meters 📈" in purchases:
-        st.write("Input Levels"); st.markdown('<div class="vu-meter"></div>', unsafe_allow_html=True)
+    
+    # VU Meters logic (Includes the new Obsidian rarity version)
+    if any(x in purchases for x in ["Analog VU Meters 📈", "Obsidian VU Meters 🌑"]):
+        st.write("Input Levels")
+        st.markdown('<div class="vu-meter"></div>', unsafe_allow_html=True)
+    
+    # Line 174 Fix: Displays the points calculated in your new Section 3
     st.metric("Budget", f"{user_points} RC")
     
-    st.divider(); st.subheader("📋 QUEST LOG")
+    st.divider()
+    st.subheader("📋 QUEST LOG")
     claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
     st.progress(len(claimed_today) / 3)
     for t in daily_tasks:
-        if any(t['id'] in x for x in tasks_done if today_str in x): st.success(f"✅ {t['desc']}")
+        if any(t['id'] in x for x in tasks_done if today_str in x):
+            st.success(f"✅ {t['desc']}")
         elif t['req']:
             if st.button(f"Claim {t['rc']} RC", key=f"q_{t['id']}"):
-                tasks_done.append(f"{today_str}_{t['id']}_RC{t['rc']}"); save_all(); st.rerun()
-        else: st.info(f"⚪ {t['desc']}")
+                tasks_done.append(f"{today_str}_{t['id']}_RC{t['rc']}")
+                save_all()
+                st.rerun()
+        else:
+            st.info(f"⚪ {t['desc']}")
 
-    st.divider(); st.subheader("⚙️ SETTINGS")
-    # CAREER THEME UNLOCKS
+    st.divider()
+    st.subheader("⚙️ SETTINGS")
+    
+    # UPDATED THEME UNLOCKS: Checking new milestone IDs
     unlocked_t = ["Default Dark"]
-    if "day1" in claimed: unlocked_t.append("Classic Studio 🎙️")
-    if "words_500" in claimed: unlocked_t.append("Golden Era 🪙")
-    if "streak_14" in claimed: unlocked_t.append("Midnight Diamond 💎")
+    if "mil_1" in claimed: unlocked_t.append("Classic Studio 🎙️")
+    if any("mil_" in c and int(c.split('_')[1]) >= 5 for c in claimed): unlocked_t.append("Golden Era 🪙")
+    if any("mil_" in c and int(c.split('_')[1]) >= 20 for c in claimed): unlocked_t.append("Midnight Reflection 🌧️")
     
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
-    if sel_theme != active_theme: save_all(theme_to_save=sel_theme); st.rerun()
+    if sel_theme != active_theme:
+        save_all(theme_to_save=sel_theme)
+        st.rerun()
     
-    st.write("**Toggle Gear**")
+    st.write("**Toggle Gear & Collection**")
     new_gear_list = []
-    # Combined list of Shop Gear + Career Exclusive Gear
-    available_gear = list(gear_items.keys()) + ["Neon Rack Glow 🟣"]
-    for g in available_gear:
-        # Check if bought OR if career milestone reached
-        is_unlocked = (g in purchases) or (g == "Neon Rack Glow 🟣" and "streak_3" in claimed) or (g == "Mastering Console 🎛️" and "words_2000" in claimed)
-        if is_unlocked:
+    
+    # DYNAMIC GEAR LIST:
+    # This automatically shows EVERYTHING you've ever won from a chest or achievement
+    # plus the standard shop gear.
+    standard_gear = list(gear_items.keys()) + ["Neon Rack Glow 🟣"]
+    # Filter purchases to only show things that look like gear/cosmetics
+    all_unlocked_gear = list(set(standard_gear + [p for p in purchases if "(" in p or "🎨" in p or any(word in p for word in COSMETIC_NOUNS)]))
+    
+    for g in all_unlocked_gear:
+        # Check if bought, won in chest, or special milestone reward
+        is_owned = (g in purchases) or (g in claimed) or (g == "Neon Rack Glow 🟣" and any("mil_" in c and int(c.split('_')[1]) >= 3 for c in claimed))
+        
+        if is_owned:
             if st.checkbox(g, value=(g in enabled_gear), key=f"chk_{g}"):
                 new_gear_list.append(g)
                 
     if sorted(new_gear_list) != sorted(enabled_gear):
-        save_all(gear_to_save=new_gear_list); st.rerun()
+        save_all(gear_to_save=new_gear_list)
+        st.rerun()
 
     st.divider()
     if st.button("🎁 TEST CHEST ANIMATION", use_container_width=True):

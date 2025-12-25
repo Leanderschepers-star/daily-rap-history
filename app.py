@@ -186,8 +186,8 @@ if "Diamond Studded Trim 💎" in purchases: rack_style += "box-shadow: 10px 0px
 
 st.markdown(f"""
 <style>
-    {led_anim_css}
-    {neon_pulse}
+    {{led_anim_css}}
+    {{neon_pulse}}
     .stApp {{ {themes_css.get(active_theme, themes_css['Default Dark'])} }}
     section[data-testid="stSidebar"] {{ {rack_style} }}
 

@@ -37,16 +37,18 @@ def update_github_file(content, msg="Update Studio Data"):
     data = {"message": msg, "content": encoded, "sha": sha} if sha else {"message": msg, "content": encoded}
     return requests.put(url, json=data, headers=headers)
 
-# --- 3. DATA PARSING ---
+# --- 3. DATA PARSING (LOAD FILE) ---
 hist_json = get_github_file(REPO_NAME, HISTORY_PATH)
 full_text = base64.b64decode(hist_json['content']).decode('utf-8') if hist_json else ""
 
+# Extract Lists
 purchases = list(set(re.findall(r'PURCHASE: (.*)', full_text)))
 claimed = list(set(re.findall(r'CLAIMED: (.*)', full_text)))
 tasks_done = list(set(re.findall(r'TASK_DONE: (.*)', full_text)))
 active_theme = re.search(r'ACTIVE_THEME: (.*)', full_text).group(1) if "ACTIVE_THEME:" in full_text else "Default Dark"
 enabled_gear = list(set(re.findall(r'ENABLED_GEAR: (.*)', full_text)))
 
+# Extract Lyrics Map
 entry_map = {}
 blocks = re.split(r'-{10,}', full_text)
 for b in blocks:
@@ -58,9 +60,9 @@ for b in blocks:
             lyr_content = lyr_match.group(1).strip() if lyr_match else ""
             if lyr_content: entry_map[d_str] = lyr_content
 
-# --- 4. DEFINITIONS & LOGIC (MUST BE HERE BEFORE SIDEBAR) ---
+# --- 4. ENGINE: DEFINITIONS (MUST BE HERE) ---
 
-# Rarity System
+# Rarity & Reward System
 RARITIES = {
     "COMMON": {"color": "#9da5b4", "chance": 0.60, "rc_range": (50, 150)},
     "UNCOMMON": {"color": "#1eff00", "chance": 0.25, "rc_range": (200, 400)},
@@ -69,11 +71,11 @@ RARITIES = {
     "LEGENDARY": {"color": "#ff8000", "chance": 0.01, "rc_range": (5000, 10000)}
 }
 
-# Procedural Loot Generation
 COSMETIC_PREFIXES = ["Cyber", "Vintage", "Ghost", "Neon", "Diamond", "Rusty", "Liquid", "Royal", "Midnight", "Electric", "Obsidian", "Chrome", "Golden", "Toxic", "Frozen", "Holographic"]
 COSMETIC_NOUNS = ["Mic", "Cable", "Foam", "Monitor", "Chair", "Desk", "Headphones", "Pre-amp", "Vinyl", "Poster", "Speaker", "Pop-filter", "Sampler", "Synth"]
 
 def roll_loot_box():
+    """Generates a random reward based on rarity."""
     roll = random.random()
     cumulative = 0
     for rarity, data in RARITIES.items():
@@ -88,23 +90,31 @@ def roll_loot_box():
                 return {"type": "RC", "name": f"{amt} Rhyme Coins", "val": amt, "rarity": rarity}
     return {"type": "RC", "name": "50 RC", "val": 50, "rarity": "COMMON"}
 
-# Generate Achievement Levels
-ACHIEVEMENT_GOALS = []
-for i in range(1, 501):
-    ACHIEVEMENT_GOALS.append({
-        "id": f"mil_{i}",
-        "name": f"Level {i}: {'Rookie' if i<10 else 'Pro' if i<50 else 'Legend'}",
-        "target": i * 5, 
-        "reward": "Mystery Loot Box"
-    })
+# Save Function (This fixes your error: It is defined BEFORE use)
+def save_all(theme_to_save=None, gear_to_save=None):
+    t = theme_to_save if theme_to_save else active_theme
+    g_list = gear_to_save if gear_to_save is not None else enabled_gear
+    
+    content = f"ACTIVE_THEME: {t}\n"
+    for g in g_list: content += f"ENABLED_GEAR: {g}\n"
+    for p in sorted(purchases): content += f"PURCHASE: {p}\n"
+    for c in sorted(claimed): content += f"CLAIMED: {c}\n"
+    for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
+    
+    clean_map = {k: v for k, v in entry_map.items() if v.strip()}
+    for d in sorted(clean_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
+        content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{clean_map[d]}\n------------------------------"
+    
+    update_github_file(content)
 
-# --- 5. CALCULATIONS (Create Variables for Sidebar) ---
-# Basic Stats
+# --- 5. CALCULATIONS (STATE) ---
+
+# 1. Stats
 total_words = sum([len(lyr.split()) for lyr in entry_map.values()])
 today_word_count = len(entry_map.get(today_str, "").split())
 active_sessions = len([k for k, v in entry_map.items() if v.strip()])
 
-# Shop Definitions
+# 2. Points & Shop
 sidebar_customs = {
     "Brushed Steel Rack 🏗️": 500, "Wooden Side-Panels 🪵": 800,
     "Analog VU Meters 📈": 1200, "Neon Rack Glow 🟣": 2000,
@@ -118,12 +128,11 @@ gear_items = {
 }
 all_shop = {**sidebar_customs, **gear_items}
 
-# Points Logic
 bonus_rc = sum([int(re.search(r'RC(\d+)', x).group(1)) for x in tasks_done if "RC" in x])
 spent_rc = sum([all_shop.get(p, 0) for p in purchases if p in all_shop])
 user_points = (total_words // 2) + (active_sessions * 10) + bonus_rc - spent_rc
 
-# Streak Logic
+# 3. Streak Logic
 current_streak = 0
 check_date = today_date
 if today_str not in entry_map: check_date = today_date - timedelta(days=1)
@@ -134,7 +143,7 @@ while True:
         check_date -= timedelta(days=1)
     else: break
 
-# Daily Quests
+# 4. Daily Quests
 random.seed(today_str)
 dynamic_goal = random.choice([50, 100, 150, 250])
 daily_tasks = [
@@ -143,23 +152,17 @@ daily_tasks = [
     {"id": "q_streak", "desc": "Maintain streak (1+)", "req": current_streak >= 1, "rc": 75}
 ]
 
-# --- 6. THE SAVE FUNCTION (CRITICAL: Must be defined here) ---
-def save_all(theme_to_save=None, gear_to_save=None):
-    t = theme_to_save if theme_to_save else active_theme
-    g_list = gear_to_save if gear_to_save is not None else enabled_gear
-    content = f"ACTIVE_THEME: {t}\n"
-    for g in g_list: content += f"ENABLED_GEAR: {g}\n"
-    for p in sorted(purchases): content += f"PURCHASE: {p}\n"
-    for c in sorted(claimed): content += f"CLAIMED: {c}\n"
-    for t_done in sorted(tasks_done): content += f"TASK_DONE: {t_done}\n"
-    
-    clean_map = {k: v for k, v in entry_map.items() if v.strip()}
-    for d in sorted(clean_map.keys(), key=lambda x: datetime.strptime(x, '%d/%m/%Y'), reverse=True):
-        content += f"\n------------------------------\nDATE: {d}\nLYRICS:\n{clean_map[d]}\n------------------------------"
-    
-    update_github_file(content)
+# 5. Achievement Generation (500 Levels)
+ACHIEVEMENT_GOALS = []
+for i in range(1, 501):
+    ACHIEVEMENT_GOALS.append({
+        "id": f"mil_{i}",
+        "name": f"Level {i}: {'Rookie' if i<10 else 'Pro' if i<50 else 'Legend'}",
+        "target": i * 5, 
+        "reward": "Mystery Loot Box"
+    })
 
-# --- 7. VISUAL CSS ---
+# --- 6. VISUAL CSS ---
 themes_css = {
     "Default Dark": "background: #0f0f0f;",
     "Classic Studio 🎙️": "background-color: #1a1e23; background-image: linear-gradient(0deg, #23282e 1px, transparent 1px), linear-gradient(90deg, #23282e 1px, transparent 1px); background-size: 40px 40px; color: #d1d8e0;",
@@ -220,7 +223,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 8. SIDEBAR UI ---
+# --- 7. SIDEBAR UI (NOW SAFE TO RUN) ---
 with st.sidebar:
     st.title("🎚️ STUDIO RACK")
     
@@ -252,13 +255,15 @@ with st.sidebar:
     st.divider()
     st.subheader("⚙️ SETTINGS")
     
-    # Milestone Unlocks
+    # Unlock Themes based on Milestones
     unlocked_t = ["Default Dark"]
     if any("mil_" in c and int(c.split('_')[1]) >= 1 for c in claimed): unlocked_t.append("Classic Studio 🎙️")
     if any("mil_" in c and int(c.split('_')[1]) >= 5 for c in claimed): unlocked_t.append("Golden Era 🪙")
     if any("mil_" in c and int(c.split('_')[1]) >= 20 for c in claimed): unlocked_t.append("Midnight Reflection 🌧️")
     
     sel_theme = st.selectbox("Ambience", unlocked_t, index=unlocked_t.index(active_theme) if active_theme in unlocked_t else 0)
+    
+    # THIS CAUSED YOUR ERROR: now it's safe because save_all is defined above
     if sel_theme != active_theme:
         save_all(theme_to_save=sel_theme)
         st.rerun()
@@ -286,7 +291,7 @@ with st.sidebar:
         st.session_state["show_reward"] = {"name": "Obsidian Mic (LEGENDARY)", "rarity": "LEGENDARY", "type": "COSMETIC"}
         st.rerun()
 
-# --- 9. REWARD OVERLAY & CHEST ---
+# --- 8. REWARD OVERLAY & CHEST ---
 if st.session_state["show_reward"]:
     reward = st.session_state["show_reward"]
     r_color = RARITIES.get(reward.get('rarity', 'COMMON'), RARITIES['COMMON'])['color']
@@ -317,7 +322,7 @@ if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not 
     save_all()
     st.rerun()
 
-# --- 10. MAIN APP UI ---
+# --- 9. MAIN APP TABS ---
 c1, c2, c3 = st.columns(3)
 with c1: st.markdown(f'<div class="stats-card"><h3>Streak</h3><h2>🔥 {current_streak}</h2></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="stats-card"><h3>Session Words</h3><h2>📝 {today_word_count}</h2></div>', unsafe_allow_html=True)
@@ -363,7 +368,7 @@ with t_shop:
 
 with t_car:
     st.subheader("🏆 YOUR LIFELONG CAREER")
-    # Show only next 5 unclaimed goals
+    # Show only next 5 unclaimed goals to avoid UI clutter
     upcoming = [a for a in ACHIEVEMENT_GOALS if a['id'] not in claimed][:5]
     
     if not upcoming:

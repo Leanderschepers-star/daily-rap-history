@@ -284,6 +284,11 @@ if st.session_state["show_reward"]:
     st.session_state["show_reward"] = None
     st.rerun()
 
+
+# 1. First, create the list of what was claimed today
+claimed_today = [t for t in daily_tasks if any(t['id'] in x for x in tasks_done if today_str in x)]
+
+# 2. Now it is safe to check if the length is 3
 can_open = (len(claimed_today) == 3 and not any("CHEST" in x for x in tasks_done if today_str in x))
 if st.button("🎁 OPEN DAILY LOOT BOX", use_container_width=True, disabled=not can_open):
     st.balloons()

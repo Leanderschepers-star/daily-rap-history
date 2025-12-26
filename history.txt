@@ -4,6 +4,7 @@ ENABLED_GEAR: Holographic Monitor (COMMON)
 ENABLED_GEAR: LED Strips 🌈
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: Holographic Monitor (COMMON)
+PURCHASE: Holographic Monitor (COMMON)
 PURCHASE: LED Strips 🌈
 CLAIMED: day1
 CLAIMED: first

@@ -28,6 +28,7 @@ TASK_DONE: 25/12/2025_q_streak_RC75
 TASK_DONE: 25/12/2025_q_words_RC100
 TASK_DONE: 26/12/2025_q_rec_RC50
 TASK_DONE: 26/12/2025_q_streak_RC75
+TASK_DONE: 26/12/2025_q_words_RC100
 
 ------------------------------
 DATE: 26/12/2025

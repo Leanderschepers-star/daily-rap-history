@@ -1,6 +1,6 @@
 ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: Acoustic Foam 🔇
-ENABLED_GEAR: LED Strips 🌈
+ENABLED_GEAR: Holographic Monitor (COMMON)
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: Holographic Monitor (COMMON)
 PURCHASE: LED Strips 🌈

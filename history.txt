@@ -1,9 +1,8 @@
 ACTIVE_THEME: Classic Studio 🎙️
-ENABLED_GEAR: Acoustic Foam 🔇
-ENABLED_GEAR: Holographic Monitor (COMMON)
 ENABLED_GEAR: LED Strips 🌈
+ENABLED_GEAR: Holographic Monitor (COMMON)
+ENABLED_GEAR: Acoustic Foam 🔇
 PURCHASE: Acoustic Foam 🔇
-PURCHASE: Holographic Monitor (COMMON)
 PURCHASE: Holographic Monitor (COMMON)
 PURCHASE: LED Strips 🌈
 CLAIMED: day1
@@ -32,6 +31,7 @@ TASK_DONE: 25/12/2025_q_words_RC100
 TASK_DONE: 26/12/2025_q_rec_RC50
 TASK_DONE: 26/12/2025_q_streak_RC75
 TASK_DONE: 26/12/2025_q_words_RC100
+TASK_DONE: 27/12/2025_q_streak_RC75
 
 ------------------------------
 DATE: 26/12/2025

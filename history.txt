@@ -1,7 +1,7 @@
 ACTIVE_THEME: Classic Studio 🎙️
 ENABLED_GEAR: LED Strips 🌈
-ENABLED_GEAR: Holographic Monitor (COMMON)
 ENABLED_GEAR: Acoustic Foam 🔇
+ENABLED_GEAR: Holographic Monitor (COMMON)
 PURCHASE: Acoustic Foam 🔇
 PURCHASE: Holographic Monitor (COMMON)
 PURCHASE: LED Strips 🌈
@@ -33,6 +33,22 @@ TASK_DONE: 26/12/2025_q_streak_RC75
 TASK_DONE: 26/12/2025_q_words_RC100
 TASK_DONE: 27/12/2025_q_streak_RC75
 
+------------------------------
+DATE: 27/12/2025
+LYRICS:
+My emotions get way too intricate
+Can't seem to live with it
+It's a maze and the pain gets too intimate 
+Makes me stuck in a toxic relationship
+
+It feels good one time
+The next it feels like a sentence forcing to rhyme 
+While I know that I created my own crime 
+And now I'm forced to say "I'm just fine" 
+While I keep falling off the line 
+
+
+------------------------------
 ------------------------------
 DATE: 26/12/2025
 LYRICS:
